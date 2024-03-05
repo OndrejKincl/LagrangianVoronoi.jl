@@ -19,9 +19,10 @@ mutable struct CellList
         if (h <= 0.0)
             throw(ArgumentError("h must be positive"))
         end
-        origin = boundary_rect.xmin
-        n1 = floor(Int, (boundary_rect.xmax[1] - boundary_rect.xmin[1])/h) + 1
-		n2 = floor(Int, (boundary_rect.xmax[2] - boundary_rect.xmin[2])/h) + 1
+        # make to box slightly bigger to avoid problems on boundary
+        origin = boundary_rect.xmin - RealVector(h,h)
+        n1 = floor(Int, (boundary_rect.xmax[1] - boundary_rect.xmin[1])/h) + 3
+		n2 = floor(Int, (boundary_rect.xmax[2] - boundary_rect.xmin[2])/h) + 3
         cells = [PreAllocVector{Int}(CELL_SIZEHINT) for _ in 1:n1, _ in 1:n2]
         locks = [ReentrantLock()                    for _ in 1:n1, _ in 1:n2]
         # the path which is used for visiting neighbors

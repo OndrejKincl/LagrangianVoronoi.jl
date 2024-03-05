@@ -15,7 +15,7 @@ mutable struct VoronoiGrid{T}
             cell_list, 
             polygons, 
             index_containers,
-            Inf
+            h
         )
     end
 end 
@@ -24,6 +24,7 @@ end
 
 # cut polygon poly using all other polygon seeds as cutting tools
 @inbounds function voronoicut!(grid::VoronoiGrid, poly::VoronoiPolygon)
+    poly.isbroken = false
     x = poly.x
     prr = influence_rr(poly)
     key0 = findkey(grid.cell_list, x)
@@ -31,7 +32,11 @@ end
     for node in grid.cell_list.magic_path
         rr = node.rr
         offset = node.key
-        if (rr > prr) || (rr > grid.rr_max)
+        if (rr > prr)
+            break
+        end
+        if (rr > grid.rr_max)
+            poly.isbroken = true
             break
         end
         key = key0 + offset
@@ -119,4 +124,10 @@ function nearest_polygon(grid::VoronoiGrid, x::RealVector)::VoronoiPolygon
         end
     end
     return grid.polygons[i_best]
+end
+
+function point_value(grid::VoronoiGrid, x::RealVector, fun::Function)
+    p = nearest_polygon(grid, x)
+    L = ls_reconstruction(LinearExpansion, grid, p, fun) 
+    return fun(p) + dot(L, x - p.x)
 end

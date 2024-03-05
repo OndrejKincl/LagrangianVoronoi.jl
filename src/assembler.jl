@@ -1,67 +1,82 @@
 using SparseArrays
+using Base.Threads
 
-# assemble vector from a unary function
-function assemble_vector(grid::VoronoiGrid, vector_element::Function; fix_avg::Bool = false)::Vector{Float64}
-    #if !hasmethod(vector_element, (VoronoiPolygon, ))
-    #    throw(ArgumentError("functional argument must be fun(::VoronoiPolygon)::Float64"))
-    #end  
-    N = length(grid.polygons)
-	v = zeros(N)
-	for i in 1:N
-		v[i] = vector_element(grid, grid.polygons[i])
-	end
-    if fix_avg
-        push!(v, 0.0)
-    end
-	return v
-end
+# assemble (sparse) matrix from functions on VoronoiPolygons
+# todo : make paralel
+function assemble_system(
+    grid::VoronoiGrid, 
+    diagonal_element::Function, edge_element::Function, vector_element::Function;
+    filter::Function = (::VoronoiPolygon -> true),
+    constrained_average::Bool = false
+    )::Tuple{SparseMatrixCSC{Float64}, Vector{Float64}}
 
-# assemble (sparse) matrix from a binary function
-function assemble_matrix(grid::VoronoiGrid, diagonal_element::Function, edge_element::Function; fix_avg::Bool = false)::SparseMatrixCSC{Float64}
     if !hasmethod(diagonal_element, (VoronoiGrid, VoronoiPolygon))
-        throw(ArgumentError("first functional argument must be fun(::VoronoiGrid, ::VoronoiPolygon)::Float64"))
+        throw(ArgumentError("diagonal element must be a function (::VoronoiGrid, ::VoronoiPolygon)::Float64"))
     end
     if !hasmethod(edge_element, (VoronoiPolygon, VoronoiPolygon, Edge))
-        throw(ArgumentError("second functional argument must be fun(::VoronoiPolygon, ::VoronoiPolygon, ::Edge)::Float64"))
+        throw(ArgumentError("edge element must be a function (::VoronoiPolygon, ::VoronoiPolygon, ::Edge)::Float64"))
     end
-    N = length(grid.polygons)
-    I = Int[]
-    J = Int[]
-    V = Float64[]
-    for i in eachindex(grid.polygons)
-        p = grid.polygons[i]
-        v = diagonal_element(grid, p)
-        if v != 0.0
-            push!(I, i)
-            push!(J, i)
-            push!(V, v)
+    if !hasmethod(vector_element, (VoronoiGrid, VoronoiPolygon))
+        throw(ArgumentError("edge element must be a function (::VoronoiGrid, ::VoronoiPolygon)::Float64"))
+    end
+    N = 0
+    # assign ids
+    for p in grid.polygons
+        if filter(p)
+            N += 1
+            p.id = N
         end
+    end
+    rhs = zeros(N)
+    I = [Int[] for _ in 1:Threads.nthreads()]
+    J = [Int[] for _ in 1:Threads.nthreads()]
+    V = [Float64[] for _ in 1:Threads.nthreads()]
+    @threads for p in grid.polygons
+        if !filter(p)
+            continue
+        end
+        i = p.id
+        rhs[i] = vector_element(grid, p)
+        v = diagonal_element(grid, p)
+        push_matrix_element!(I, J, V, i, i, v)
         for e in p.edges
-            j = e.label
-            if !checkbounds(Bool, grid.polygons, j)
+            if !checkbounds(Bool, grid.polygons, e.label)
                 continue
             end
-            q = grid.polygons[j]
+            q = grid.polygons[e.label]
+            if !filter(q)
+                continue
+            end
+            j = q.id
             v = edge_element(p, q, e)
-            if v != 0.0
-                push!(I, i)
-                push!(J, j)
-                push!(V, v)
-            end 
+            push_matrix_element!(I, J, V, i, j, v)
         end
-        if fix_avg 
-            push!(I, i)
-            push!(J, N+1)
-            push!(V, -1.0/N)
+        if constrained_average
+            push_matrix_element!(I, J, V, i, N+1, 1.0)
         end
     end
-    if fix_avg
-        for j in eachindex(grid.polygons)
-            push!(I, N+1)
-            push!(J, j)
-            push!(V, 1.0/N)
+    if constrained_average
+        push!(rhs, 0.0)
+        for j in 1:N
+            push_matrix_element!(I, J, V, N+1, j, 1.0)
         end
-        return sparse(I, J, V, N+1, N+1)
+        N += 1
     end
-    return sparse(I, J, V, N, N)
+    for n in 2:Threads.nthreads()
+        append!(I[1], I[n])
+        append!(J[1], J[n])
+        append!(V[1], V[n])
+    end
+    return (sparse(I[1], J[1], V[1], N, N), rhs)
+end
+
+function push_matrix_element!(I::Vector, J::Vector, V::Vector, i::Int, j::Int, v::Float64)
+    _I = I[Threads.threadid()]
+    _J = J[Threads.threadid()]
+    _V = V[Threads.threadid()]
+    if v != 0.0
+        push!(_I, i)
+        push!(_J, j)
+        push!(_V, v)
+    end
 end

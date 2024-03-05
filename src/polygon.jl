@@ -15,10 +15,14 @@ end
 mutable struct VoronoiPolygon{T}
     x::RealVector
     edges::PreAllocVector{Edge}  # sides of the polygon (in no particular order)
+    isbroken::Bool
+    id::Int
     var::T
     VoronoiPolygon{T}(x::RealVector) where T = new{T}(
         x,
         PreAllocVector{Edge}(POLYGON_SIZEHINT),
+        false,
+        0,
         T(x)
     )
 end
@@ -95,6 +99,9 @@ function influence_rr(p::VoronoiPolygon)::Float64
 end
 
 function area(p::VoronoiPolygon)::Float64
+    if p.isbroken
+        throw("area undefined for broken polygon.")
+    end
     A = 0.0
     for e in p.edges
         # we need to use abs because the edges may not 
@@ -109,6 +116,9 @@ function isboundary(e::Edge)
 end
 
 function isboundary(p::VoronoiPolygon)
+    if p.isbroken
+        throw("isboundary undefined for broken polygon.")
+    end
     for e in p.edges
         if isboundary(e)
             return true
@@ -123,6 +133,9 @@ end
 end
 
 @inbounds function surface_element(p::VoronoiPolygon)
+    if p.isbroken
+        throw("surface element undefined for broken polygon.")
+    end
     dS = VEC0
     for e in p.edges
         if isboundary(e)
@@ -133,7 +146,10 @@ end
 end
 
 
-function is_inside(p::VoronoiPolygon, x::RealVector)::Bool
+@inbounds function is_inside(p::VoronoiPolygon, x::RealVector)::Bool
+    if p.isbroken
+        throw("isinside undefined for broken polygon.")
+    end
     # Sunday algorithm
     wn = 0
     for e in p.edges

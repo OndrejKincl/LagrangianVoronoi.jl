@@ -48,3 +48,12 @@ end
 function norm_squared(x::RealVector)::Float64
     return dot(x, x)
 end
+
+function verts(r::Rectangle)::NTuple{4, RealVector}
+    return (
+        RealVector(r.xmin[1], r.xmin[2]),
+        RealVector(r.xmin[1], r.xmax[2]),
+        RealVector(r.xmax[1], r.xmax[2]),
+        RealVector(r.xmax[1], r.xmin[2])
+    )
+end

@@ -17,6 +17,9 @@ function apply_binary!(grid::VoronoiGrid, fun::Function)
                 continue
             end
             q = grid.polygons[e.label]
+            if p.isbroken && q.isbroken
+                continue
+            end
             fun(p, q, e)
         end
     end
