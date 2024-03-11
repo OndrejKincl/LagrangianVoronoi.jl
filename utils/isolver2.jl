@@ -12,7 +12,6 @@ include("multmat.jl")
 const NOT_BC = 0
 const DIRICHLET_BC = 1 #(homogen.)
 const NEUMANN_BC = 2   #(homogen.)
-const FREE_PENALTY = 1.0
 
 function lr_ratio(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)::Float64
     l2 = norm_squared(e.v1 - e.v2)
@@ -32,8 +31,6 @@ function poi_diagonal(grid::VoronoiGrid, p::VoronoiPolygon)::Float64
             if q.var.bc_type != NEUMANN_BC
                 de += (0.5/p.var.rho + 0.5/q.var.rho)*lr_ratio(p, q, e)
             end
-        else
-            de += FREE_PENALTY/h*len(e)
         end
     end
     return de
@@ -62,8 +59,8 @@ function find_pressure!(grid::VoronoiGrid; no_dirichlet::Bool = false)
     )
     # solve the system
     begin
-        P_vector = A\b
-        #P_vector = minres(ThreadedMul(A), b)
+        #P_vector = A\b
+        P_vector = minres(ThreadedMul(A), b)
     end
     # extract the pressure from p_vec
     @threads for p in grid.polygons

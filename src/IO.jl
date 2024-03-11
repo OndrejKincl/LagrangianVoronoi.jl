@@ -14,10 +14,15 @@ function export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
         normalize!(poly)
         # construct the meshcell
         n0 = length(verts)
-        for i in 1:length(poly.edges)
-            push!(verts, Vec3(poly.edges[i].v1))
-        end 
-        meshcell = (n0+1):(n0+length(poly.edges))
+        if !poly.isbroken
+            for i in 1:length(poly.edges)
+                push!(verts, Vec3(poly.edges[i].v1))
+            end 
+            meshcell = (n0+1):(n0+length(poly.edges))
+        else
+            push!(verts, Vec3(poly.x))
+            meshcell = (n0+1,)
+        end
         push!(polys, MeshCell(PolyData.Polys(), meshcell))
     end
     if isempty(verts)

@@ -25,7 +25,7 @@ const h_stab = h
 
 const export_path = "results/gresho"
 
-include("../utils/isolver.jl")
+include("../utils/isolver2.jl")
 include("../utils/populate.jl")
 
 @with_kw mutable struct PhysFields
