@@ -1,43 +1,46 @@
 module gresho
 
-using WriteVTK, LinearAlgebra, Random, Match, DataFrames, CSV, Plots, Parameters
+using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using SmoothedParticles:rDwendland2
-using LaTeXStrings
+#using LaTeXStrings, DataFrames, CSV, Plots
 
 
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const v_char = 1.0
+const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 100 #resolution
+const N = 200 #resolution
 const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
-const t_end =  10*dt
-const nframes = 2
+const tau_r = 0.2*l_char/v_char
+const t_end =  0.5
+const nframes = 5
 
-const P_stab = 0.01*rho0*v_char^2
 const h = 2.0*dr
-const h_stab = h
 
-const export_path = "results/gresho2"
+const export_path = "results/gresho"
 
 include("../utils/parallel_settings.jl")
-include("../utils/isolver2.jl")
-include("../utils/populate.jl")
 
+include("../utils/populate.jl")
+include("../utils/lloyd.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
     v::RealVector = VEC0
     a::RealVector = VEC0
     P::Float64 = 0.0
-    bc_type::Int = NOT_BC
     rho::Float64 = rho0
+    lloyd_dx::RealVector = VEC0
+    lloyd_dv::RealVector = VEC0
 end
+
+include("../utils/isolver5.jl")
 
 function PhysFields(x::RealVector)
     return PhysFields(v = v_exact(x))
@@ -88,15 +91,21 @@ function main()
 
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
-    solver = pressure_solver(grid)
-    
-    for k = 0 : k_end
+
+    solver = PressureSolver(grid)
+    @time for k = 0 : k_end
         apply_unary!(grid, move!)
+        lloyd_stabilization!(grid, tau_r)
         remesh!(grid)
-        apply_local!(grid, stabilizer!, grid.h)
         apply_unary!(grid, no_slip!)
-        @time find_pressure!(grid, solver)
-        apply_binary!(grid, pressure_force!)
+        try
+            find_pressure!(solver, dt)
+        catch e
+            vtk_save(pvd_p)
+            vtk_save(pvd_c)
+            throw(e)
+        end
+        apply_binary!(grid, internal_force!)
         apply_unary!(grid, accelerate!)
         apply_unary!(grid, no_slip!)
         if ((k_end - k) % k_frame == 0)
@@ -112,13 +121,14 @@ function main()
             nframe += 1
         end
     end
-    vtk_save(pvd_p)
-    vtk_save(pvd_c)
+    #vtk_save(pvd_p)
+    #vtk_save(pvd_c)
 
-    csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
-	CSV.write(string(export_path, "/error_data.csv"), csv_data)
+    #csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
+	#CSV.write(string(export_path, "/error_data.csv"), csv_data)
 
     # export velocity profile along midline
+    #=
     x_range = 0.0:(2*dr):xlims[2]
     vy_sim = Float64[]
     vy_exact = Float64[]
@@ -130,8 +140,11 @@ function main()
     csv_data = DataFrame(x = x_range, vy_sim = vy_sim, vy_exact = vy_exact)
 	CSV.write(string(export_path, "/midline_data.csv"), csv_data)
     plot_midline()
+    =#
 
 end
+
+#=
 
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
@@ -156,6 +169,7 @@ function plot_midline()
 
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
+=#
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()

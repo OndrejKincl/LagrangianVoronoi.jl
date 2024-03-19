@@ -11,12 +11,12 @@ using Base.Threads
 using WriteVTK
 using SmoothedParticles:rDwendland2
 
-const A0 = 0.5
+const A0 = -0.5
 const R = 1.0
 const rho0 = 1.0
-const dr = R/100
+const dr = R/50
 
-const v_char = A0*R
+const v_char = abs(A0)*R
 const dt = 0.2*dr/v_char
 const t_end =  1.0
 const nframes = 20
@@ -25,14 +25,14 @@ const P_stab = 1e-2*rho0*v_char^2
 
 const h = 2*dr
 const h_stab = h
-const h_freecut = dr
+const crop_R = 0.9*dr
 
 const FREE_N = 20
 
 
 const export_path = "results/cpatch"
 include("../utils/populate.jl")
-include("../utils/isolver.jl")
+include("../utils/freecut_isolver.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
@@ -44,6 +44,8 @@ include("../utils/isolver.jl")
     bc_type::Int = NOT_BC
     rho::Float64 = rho0
     x0::RealVector = VEC0
+    isfree::Bool = false
+    crop_R::Float64 = crop_R
 end
 
 export_vars = (:v, :P, :P_exact, :v_exact, :mass)
@@ -85,31 +87,18 @@ function find_energy(grid::VoronoiGrid)::Float64
 end
 
 function assign_mass!(p::VoronoiPolygon)
-    p.var.mass = rho0*area(p)
+    p.var.mass = rho0*free_area(p)
 end
-
-function crop_free_polygons!(p::VoronoiPolygon)
-    rad = maximum(e -> max(norm(e.v1 - p.x)), p.edges) 
-    if rad > h_freecut
-        for k in 1:FREE_N
-            theta = 2.0*pi*k/FREE_N
-            y = p.x + h_freecut*RealVector(cos(theta), sin(theta))
-            LagrangianVoronoi.voronoicut!(p, y, 0)
-        end
-    end
-    p.isbroken = false
-end
-
 
 function main()
     ode = ODEProblem(ellipse_ode, [R, R, A0], (0.0, t_end))
     ellipse = solve(ode, Rodas4(), reltol = 1e-8, abstol = 1e-8)
     domain = Rectangle(xlims = (-3*R, 3*R), ylims = (-3*R, 3*R))
-    grid = VoronoiGrid{PhysFields}(h, domain)
-    grid.rr_max = (2.0*h_freecut/cos(pi/FREE_N))^2
-    populate_circ!(grid, dr, charfun = (x -> norm_squared(x) < R^2))
-    #populate_rect!(grid, dr, charfun = (x -> norm_squared(x) < R^2))
-    apply_unary!(grid, crop_free_polygons!)
+    grid = VoronoiGrid{PhysFields}(2*crop_R, domain)
+
+    populate_vogel!(grid, dr, charfun = (x -> norm_squared(x) < R^2))
+    @show length(grid.polygons)
+    limit_free_polygons!(grid)
     apply_unary!(grid, assign_mass!)
     @threads for p in grid.polygons
         p.var.v = v_exact(p.x, ellipse(0.0))
@@ -140,8 +129,8 @@ function main()
             p.var.v_exact = v_exact(p.x, e)
         end
         remesh!(grid)
+        limit_free_polygons!(grid)
         apply_local!(grid, stabilizer!, grid.h)
-        apply_unary!(grid, crop_free_polygons!)
         find_pressure!(grid)
         apply_binary!(grid, pressure_force!)
         apply_unary!(grid, accelerate!)

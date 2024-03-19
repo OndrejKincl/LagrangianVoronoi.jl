@@ -17,7 +17,7 @@ const R2 = 0.3
 const v1 = 0.5
 const v2 = -0.5
 const rho0 = 1.0
-const dr = min(R1,R2)/70
+const dr = min(R1,R2)/50
 
 const v_char = 2.0
 const dt = 0.2*dr/v_char
@@ -27,10 +27,10 @@ const nframes = 100
 const domain_size = 5.0
 
 const P_stab = 0.0*rho0*v_char^2
-const h_free = 1.5*dr
+const h_free = 2.0*dr
 const h = h_free
 const h_stab = h_free
-const N_free = 10
+const N_free = 20
 
 const export_path = "results/impact"
 include("../utils/populate.jl")
@@ -43,6 +43,7 @@ include("../utils/isolver.jl")
     P::Float64 = 0.0
     bc_type::Int = NOT_BC
     rho::Float64 = rho0
+    isfree::Bool = false
 end
 
 export_vars = (:v, :P, :mass)

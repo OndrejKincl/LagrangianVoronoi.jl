@@ -17,7 +17,7 @@ function assemble_system(
         throw(ArgumentError("edge element must be a function (::VoronoiPolygon, ::VoronoiPolygon, ::Edge)::Float64"))
     end
     if !hasmethod(vector_element, (VoronoiGrid, VoronoiPolygon))
-        throw(ArgumentError("edge element must be a function (::VoronoiGrid, ::VoronoiPolygon)::Float64"))
+        throw(ArgumentError("vector element must be a function (::VoronoiGrid, ::VoronoiPolygon)::Float64"))
     end
     N = 0
     # assign ids
@@ -57,7 +57,7 @@ function assemble_system(
     end
     if constrained_average
         push!(rhs, 0.0)
-        for j in 1:N
+        @threads for j in 1:N
             push_matrix_element!(I, J, V, N+1, j, 1.0)
         end
         N += 1

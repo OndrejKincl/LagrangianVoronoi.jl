@@ -9,26 +9,28 @@ include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const v_char = 1.0
+const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
 const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.2*dr/v_char
-const t_end =  10*dt
-const nframes = 2
 
-const P_stab = 0.01*rho0*v_char^2
+const dt = 0.2*dr/v_char
+const tau_r = 0.2*l_char/v_char
+const t_end =  0.5
+const nframes = 20
+
 const h = 2.0*dr
 const h_stab = h
+const P_stab = 0.0
 
-const export_path = "results/gresho2"
+const export_path = "results/gresho_lloyd"
 
-include("../utils/parallel_settings.jl")
-include("../utils/isolver2.jl")
+include("../utils/isolver.jl")
 include("../utils/populate.jl")
-
+include("../utils/lloyd.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
@@ -37,6 +39,8 @@ include("../utils/populate.jl")
     P::Float64 = 0.0
     bc_type::Int = NOT_BC
     rho::Float64 = rho0
+    lloyd_dx::RealVector = VEC0
+    lloyd_dv::RealVector = VEC0
 end
 
 function PhysFields(x::RealVector)
@@ -56,10 +60,12 @@ export_vars = (:v, :P)
 
 function find_l2_error(grid::VoronoiGrid)::Float64
     L2_error = 0.0
+    L2_norm = 0.0
     for p in grid.polygons
         L2_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x))
+        L2_norm += area(p)*LagrangianVoronoi.norm_squared(v_exact(p.x))
     end
-    return sqrt(L2_error)
+    return sqrt(L2_error/L2_norm)
 end
 
 function find_energy(grid::VoronoiGrid)::Float64
@@ -70,10 +76,26 @@ function find_energy(grid::VoronoiGrid)::Float64
     return E
 end
 
+function tri_area(a::RealVector, b::RealVector, c::RealVector)::Float64
+    return 0.5*abs(LagrangianVoronoi.cross2(b - a, c - a))
+end
+
+function centroid(p::VoronoiPolygon)::RealVector
+    A = 0.0
+    c = VEC0
+    for e in p.edges
+        dA = tri_area(p.x, e.v1, e.v2)
+        A += dA
+        c += dA*(p.x + e.v2 + e.v2)/3
+    end
+    return c/A
+end
+
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
     populate_circ!(grid, dr)
+    #populate_rect!(grid, dr)
     apply_unary!(grid, get_mass!)
     if !ispath(export_path)
         mkpath(export_path)
@@ -88,14 +110,14 @@ function main()
 
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
-    solver = pressure_solver(grid)
+
     
-    for k = 0 : k_end
+    @time for k = 0 : k_end
+        lloyd_stabilization!(grid, tau_r)
         apply_unary!(grid, move!)
         remesh!(grid)
-        apply_local!(grid, stabilizer!, grid.h)
         apply_unary!(grid, no_slip!)
-        @time find_pressure!(grid, solver)
+        find_pressure!(grid; no_dirichlet = true)
         apply_binary!(grid, pressure_force!)
         apply_unary!(grid, accelerate!)
         apply_unary!(grid, no_slip!)
@@ -157,8 +179,5 @@ function plot_midline()
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    main()
-end
 
 end

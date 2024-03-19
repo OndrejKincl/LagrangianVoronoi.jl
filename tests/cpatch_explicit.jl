@@ -1,4 +1,4 @@
-module cpatch
+module cpatch_explicit
 
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
@@ -14,25 +14,23 @@ using SmoothedParticles:rDwendland2
 const A0 = 0.5
 const R = 1.0
 const rho0 = 1.0
-const dr = R/100
+const dr = R/50
 
 const v_char = A0*R
-const dt = 0.2*dr/v_char
-const t_end =  1.0
+const c_sound = 10.0*v_char
+const dt = 0.1*dr/c_sound
+const t_end =  0.7
 const nframes = 20
 
-const P_stab = 1e-2*rho0*v_char^2
+const P_stab = 0.01*rho0*v_char^2
 
-const h = 2*dr
-const h_stab = h
-const h_freecut = dr
-
-const FREE_N = 20
+const h_stab = 2*dr
+const crop_R = 1.5*dr
 
 
-const export_path = "results/cpatch"
+const export_path = "results/cpatch_explicit"
 include("../utils/populate.jl")
-include("../utils/isolver.jl")
+include("../utils/freecut_I.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
@@ -41,12 +39,13 @@ include("../utils/isolver.jl")
     P::Float64 = 0.0
     v_exact::RealVector = VEC0
     P_exact::Float64 = 0.0
-    bc_type::Int = NOT_BC
     rho::Float64 = rho0
     x0::RealVector = VEC0
+    isfree::Bool = false
+    crop_R::Float64 = crop_R
 end
 
-export_vars = (:v, :P, :P_exact, :v_exact, :mass)
+export_vars = (:v, :P, :P_exact, :v_exact, :mass, :rho, :isfree) 
 
 function PhysFields(x::RealVector)
     return PhysFields(x0 = x)
@@ -79,37 +78,45 @@ end
 function find_energy(grid::VoronoiGrid)::Float64
     E = 0.0
     for p in grid.polygons
-        E += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
+        E += 0.5*p.var.mass*dot(p.var.v, p.var.v)
+        E += p.var.mass*c_sound^2*(log(abs(p.var.rho/rho0)) + rho0/p.var.rho - 1.0)
     end
     return E
 end
 
 function assign_mass!(p::VoronoiPolygon)
-    p.var.mass = rho0*area(p)
+    p.var.mass = rho0*free_area(p)
 end
 
-function crop_free_polygons!(p::VoronoiPolygon)
-    rad = maximum(e -> max(norm(e.v1 - p.x)), p.edges) 
-    if rad > h_freecut
-        for k in 1:FREE_N
-            theta = 2.0*pi*k/FREE_N
-            y = p.x + h_freecut*RealVector(cos(theta), sin(theta))
-            LagrangianVoronoi.voronoicut!(p, y, 0)
-        end
-    end
-    p.isbroken = false
+function move!(p::VoronoiPolygon)
+    p.x += dt*p.var.v
 end
 
+function find_pressure!(p::VoronoiPolygon)
+   p.var.rho = p.var.mass/free_area(p) 
+   p.var.P = c_sound^2*(p.var.rho - rho0)
+end
+
+function lr_ratio(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)::Float64
+    l = free_length(p, e)
+    r = norm(p.x - q.x)
+    return l/r
+end
+
+function internal_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
+    m = 0.5*(e.v1 + e.v2)
+    z = 0.5*(p.x + q.x)
+    p.var.v += (dt/p.var.mass)*lr_ratio(p,q,e)*((p.var.P - q.var.P)*(m - z) + 0.5*(p.var.P + q.var.P - 2*P_stab)*(p.x - q.x))
+end
 
 function main()
     ode = ODEProblem(ellipse_ode, [R, R, A0], (0.0, t_end))
     ellipse = solve(ode, Rodas4(), reltol = 1e-8, abstol = 1e-8)
     domain = Rectangle(xlims = (-3*R, 3*R), ylims = (-3*R, 3*R))
-    grid = VoronoiGrid{PhysFields}(h, domain)
-    grid.rr_max = (2.0*h_freecut/cos(pi/FREE_N))^2
+    grid = VoronoiGrid{PhysFields}(crop_R, domain)
     populate_circ!(grid, dr, charfun = (x -> norm_squared(x) < R^2))
     #populate_rect!(grid, dr, charfun = (x -> norm_squared(x) < R^2))
-    apply_unary!(grid, crop_free_polygons!)
+    limit_free_polygons!(grid)
     apply_unary!(grid, assign_mass!)
     @threads for p in grid.polygons
         p.var.v = v_exact(p.x, ellipse(0.0))
@@ -133,18 +140,10 @@ function main()
     for k = 0 : k_end
         e = ellipse(k*dt)
         apply_unary!(grid, move!)
-        @threads for p in grid.polygons
-            #p.x = RealVector(p.var.x0[1]*e[1]/R, p.var.x0[2]*e[2]/R)
-            p.var.P_exact = P_exact(p.x, e)
-            #p.var.v = p.var.v_exact
-            p.var.v_exact = v_exact(p.x, e)
-        end
         remesh!(grid)
-        apply_local!(grid, stabilizer!, grid.h)
-        apply_unary!(grid, crop_free_polygons!)
-        find_pressure!(grid)
-        apply_binary!(grid, pressure_force!)
-        apply_unary!(grid, accelerate!)
+        limit_free_polygons!(grid)
+        apply_unary!(grid, find_pressure!)
+        apply_binary!(grid, internal_force!)
 
         if ((k_end - k) % k_frame == 0)
             t = k*dt

@@ -20,7 +20,8 @@ struct Edge
     v1::RealVector        # vertex
     v2::RealVector        # vertex
     label::Int            # use label to indicate a neighbor
-    Edge(v1::RealVector, v2::RealVector; label::Int = 0) = new(v1, v2, label)
+    lr_ratio::Float64
+    Edge(v1::RealVector, v2::RealVector; label::Int = 0, lr_ratio::Float64 = 0.0) = new(v1, v2, label, lr_ratio)
 end
 
 struct Rectangle
