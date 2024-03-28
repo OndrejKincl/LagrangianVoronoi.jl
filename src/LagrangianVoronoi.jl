@@ -31,4 +31,7 @@ include("ls_reconstruction.jl")
 export LinearExpansion, QuadraticExpansion, CubicExpansion
 export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral
 
+include("populate.jl")
+export populate_circ!, populate_rand!, populate_vogel!, populate_rect!
+
 end

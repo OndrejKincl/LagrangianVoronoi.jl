@@ -1,14 +1,15 @@
 module gresho
 
-using WriteVTK, LinearAlgebra, Random, Match, DataFrames, CSV, Plots, Parameters
+using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using SmoothedParticles:rDwendland2
-using LaTeXStrings
+using LaTeXStrings, DataFrames, CSV, Plots
 
 
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const v_char = 1.0
+const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
@@ -16,26 +17,32 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
-const t_end =  0.5
-const nframes = 100
+const tau_r = 100*dt #0.2*l_char/v_char
+const t_end =  3.0
+const nframes = 50
 
-const P_stab = 0.01*rho0*v_char^2
+const P_stab = 1e-5*rho0*v_char^2
+const h_stab = 3.0*dr
+
 const h = 2.0*dr
-const h_stab = h
 
 const export_path = "results/gresho"
 
+#include("../utils/parallel_settings.jl")
+include("../utils/lloyd.jl")
 include("../utils/isolver.jl")
-include("../utils/populate.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
     v::RealVector = VEC0
     a::RealVector = VEC0
     P::Float64 = 0.0
-    bc_type::Int = NOT_BC
     rho::Float64 = rho0
+    lloyd_dx::RealVector = VEC0
+    lloyd_dv::RealVector = VEC0
 end
+
+
 
 function PhysFields(x::RealVector)
     return PhysFields(v = v_exact(x))
@@ -68,10 +75,15 @@ function find_energy(grid::VoronoiGrid)::Float64
     return E
 end
 
+function SPH_stab!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
+    p.var.v += -dt*p.var.mass*(P_stab/p.var.rho^2 + P_stab/q.var.rho^2)*(p.x - q.x)*rDwendland2(h_stab, r)
+end
+
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
     populate_circ!(grid, dr)
+    #populate_rect!(grid, dr)
     apply_unary!(grid, get_mass!)
     if !ispath(export_path)
         mkpath(export_path)
@@ -87,14 +99,23 @@ function main()
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
 
-    
-    for k = 0 : k_end
+    solver = PressureSolver(grid)
+    @time for k = 0 : k_end
         apply_unary!(grid, move!)
+        lloyd_stabilization!(grid, tau_r)
         remesh!(grid)
-        apply_local!(grid, stabilizer!, grid.h)
         apply_unary!(grid, no_slip!)
-        find_pressure!(grid; no_dirichlet = true)
-        apply_binary!(grid, pressure_force!)
+        #apply_unary!(grid, p -> lloyd_acceleration!(p, tau_r, dt))
+        
+        try
+            find_pressure!(solver, dt)
+        catch e
+            vtk_save(pvd_p)
+            vtk_save(pvd_c)
+            throw(e)
+        end
+        apply_binary!(grid, internal_force!)
+        #apply_local!(grid, SPH_stab!, h_stab)
         apply_unary!(grid, accelerate!)
         apply_unary!(grid, no_slip!)
         if ((k_end - k) % k_frame == 0)
@@ -131,6 +152,7 @@ function main()
 
 end
 
+
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
     plt = plot(
@@ -155,5 +177,9 @@ function plot_midline()
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
 
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
 
 end

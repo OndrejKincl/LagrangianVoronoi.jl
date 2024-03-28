@@ -2,7 +2,7 @@ module gresho
 
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using SmoothedParticles:rDwendland2
-#using LaTeXStrings, DataFrames, CSV, Plots
+using LaTeXStrings, DataFrames, CSV, Plots
 
 
 include("../src/LagrangianVoronoi.jl")
@@ -13,22 +13,21 @@ const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 200 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
-const tau_r = 0.2*l_char/v_char
-const t_end =  0.5
-const nframes = 5
+const tau_r = l_char/v_char
+const t_end =  3.0
+const nframes = 50
 
 const h = 2.0*dr
 
-const export_path = "results/gresho"
+const export_path = "results/gresho3"
 
 include("../utils/parallel_settings.jl")
+#include("../utils/lloyd.jl")
 
-include("../utils/populate.jl")
-include("../utils/lloyd.jl")
 
 @with_kw mutable struct PhysFields
     mass::Float64 = 0.0
@@ -39,8 +38,8 @@ include("../utils/lloyd.jl")
     lloyd_dx::RealVector = VEC0
     lloyd_dv::RealVector = VEC0
 end
+include("../utils/isolver3.jl")
 
-include("../utils/isolver5.jl")
 
 function PhysFields(x::RealVector)
     return PhysFields(v = v_exact(x))
@@ -73,6 +72,26 @@ function find_energy(grid::VoronoiGrid)::Float64
     return E
 end
 
+function stabilization_test()
+    domain = Rectangle(xlims = xlims, ylims = ylims)
+    grid = VoronoiGrid{PhysFields}(h, domain)
+    populate_circ!(grid, dr)
+    remesh!(grid)
+    apply_unary!(grid, get_mass!)
+    p0 = grid.polygons[1]
+    x0 = p0.x
+    for p in grid.polygons
+        p.var.P = 0.5*norm_squared(p.x - x0)
+    end
+    apply_binary!(grid, internal_force!)
+    c0 = centroid(p0)
+    acc = p0.var.rho*dot(p0.var.a, c0 - x0)/norm_squared(c0 - x0)
+    @show acc
+    stabilize!(grid)
+    acc = p0.var.rho*dot(p0.var.a, c0 - x0)/norm_squared(c0 - x0)
+    @show acc
+end
+
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
@@ -95,9 +114,11 @@ function main()
     solver = PressureSolver(grid)
     @time for k = 0 : k_end
         apply_unary!(grid, move!)
-        lloyd_stabilization!(grid, tau_r)
+        #lloyd_stabilization!(grid, tau_r)
         remesh!(grid)
+        #apply_unary!(grid, get_mass!)
         apply_unary!(grid, no_slip!)
+        #stabilize!(grid)
         try
             find_pressure!(solver, dt)
         catch e
@@ -121,14 +142,13 @@ function main()
             nframe += 1
         end
     end
-    #vtk_save(pvd_p)
-    #vtk_save(pvd_c)
+    vtk_save(pvd_p)
+    vtk_save(pvd_c)
 
-    #csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
-	#CSV.write(string(export_path, "/error_data.csv"), csv_data)
+    csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
+	CSV.write(string(export_path, "/error_data.csv"), csv_data)
 
     # export velocity profile along midline
-    #=
     x_range = 0.0:(2*dr):xlims[2]
     vy_sim = Float64[]
     vy_exact = Float64[]
@@ -140,11 +160,9 @@ function main()
     csv_data = DataFrame(x = x_range, vy_sim = vy_sim, vy_exact = vy_exact)
 	CSV.write(string(export_path, "/midline_data.csv"), csv_data)
     plot_midline()
-    =#
 
 end
 
-#=
 
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
@@ -169,7 +187,7 @@ function plot_midline()
 
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
-=#
+
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()

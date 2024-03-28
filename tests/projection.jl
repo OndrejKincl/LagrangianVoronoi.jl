@@ -1,3 +1,9 @@
+#=
+
+OBSOLETE (DOES NOT WORK)
+
+=#
+
 module projection
 
 include("../src/LagrangianVoronoi.jl")
@@ -16,6 +22,9 @@ const v0 = 1.0
 const TaylorExpansion = LinearExpansion
 const export_path = "results/projection"
 
+
+
+
 @with_kw mutable struct PhysFields
     v::RealVector = VEC0
     P::Float64 = 0.0
@@ -28,6 +37,7 @@ const export_path = "results/projection"
     fixpoint::Bool = false
     isboundary::Bool = false
     L::RealMatrix = zero(RealMatrix)
+    rho::Float64 = rho
 end
 
 function PhysFields(x::RealVector)::PhysFields
@@ -39,9 +49,13 @@ function PhysFields(x::RealVector)::PhysFields
     return pf
 end
 
+include("../utils/isolver.jl")
+include("../utils/lloyd2.jl")
+include("../utils/parallel_settings.jl")
+
 function v_init(x::RealVector)::RealVector
-    vx = -x[1]*(x[1] - 1.0)*(x[2] - 0.5) + v0*cos(x[1])*sin(x[2]) #- pi*cos(pi*x[1])*sin(pi*x[2])
-    vy = (x[1] - 0.5)*x[2]*(x[2] - 1.0) + v0*sin(x[1])*cos(x[2]) #- pi*sin(pi*x[1])*cos(pi*x[2])
+    vx = -x[1]*(x[1] - 1.0)*(x[2] - 0.5) - pi*sin(pi*x[1])*cos(pi*x[2])
+    vy = (x[1] - 0.5)*x[2]*(x[2] - 1.0)  - pi*cos(pi*x[1])*sin(pi*x[2])
     return RealVector(vx, vy)
 end
 
@@ -52,13 +66,13 @@ function v_exact(x::RealVector)::RealVector
 end
 
 function div_exact(x::RealVector)::Float64
-    vx_x = -(2*x[1] - 1.0)*(x[2] - 0.5) - v0*sin(x[1])*sin(x[2])
-    vy_y =  (x[1] - 0.5)*(2*x[2] - 1.0) - v0*sin(x[1])*sin(x[2])
+    vx_x = -(2*x[1] - 1.0)*(x[2] - 0.5) - pi*pi*v0*cos(pi*x[1])*cos(pi*x[2])
+    vy_y =  (x[1] - 0.5)*(2*x[2] - 1.0) - pi*pi*v0*cos(pi*x[1])*cos(pi*x[2])
     return vx_x + vy_y
 end
 
 function P_exact(x::RealVector)::Float64
-    return v0*rho/dt*(sin(x[1])*sin(x[2])) #-rho/dt*sin(pi*x[1])*sin(pi*x[2])
+    return v0*rho/dt*cos(pi*x[1])*cos(pi*x[2])
 end
 
 # add points to grid
@@ -90,7 +104,7 @@ function populate_rand!(grid::VoronoiGrid, dr::Float64)
             push!(grid.polygons, VoronoiPolygon{PhysFields}(x))
         end 
     end
-    grid.polygons[1].var.fixpoint = true
+    #grid.polygons[1].var.fixpoint = true
     @show length(grid.polygons)
 end
 
@@ -104,7 +118,7 @@ function populate_square!(grid::VoronoiGrid, dr::Float64)
             if isinside(DOMAIN, x)
                 push!(grid.polygons, VoronoiPolygon{PhysFields}(x))
                 if i == div(N, 2) && j == div(N, 2)
-                    grid.polygons[end].var.fixpoint = true
+                    #grid.polygons[end].var.fixpoint = true
                 end
             end
         end 
@@ -112,12 +126,13 @@ function populate_square!(grid::VoronoiGrid, dr::Float64)
     @show length(grid.polygons)
 end
 
+#=
 function lr_ratio(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)::Float64
     l2 = norm_squared(e.v1 - e.v2)
     r2 = norm_squared(p.x - q.x)
     return sqrt(l2/r2)
 end
-
+=#
 
 # estimate divergence
 function get_invA!(p::VoronoiPolygon)
@@ -131,7 +146,8 @@ function get_div!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
     m = 0.5*(e.v1 + e.v2)
     z = 0.5*(p.x + q.x)
     #p.var.div -= lr_ratio(p,q,e)*dot(0.5*(p.x - q.x) + (m-z), p.var.v - q.var.v)
-    p.var.div += p.var.invA*lr_ratio(p,q,e)*dot(p.x - m, p.var.v - q.var.v)
+    #p.var.div += p.var.invA*lr_ratio(p,q,e)*dot(p.x - m, p.var.v - q.var.v)
+    p.var.div += p.var.invA*lr_ratio(p,q,e)*(dot(p.var.v - q.var.v, m - z) - 0.5*dot(p.var.v + q.var.v, p.x - q.x))
     #p.var.div += p.var.invA*lr_ratio(p,q,e)*dot(m - q.x, p.var.v - q.var.v)
     #p.var.div += 0.5*p.var.invA*lr_ratio(p,q,e)*dot(p.x - q.x, p.var.v - q.var.v)
     #p.var.div += p.var.invA*lr_ratio(p,q,e)*dot(m - q.x, p.var.v - q.var.v)
@@ -173,7 +189,7 @@ end
 # pressure force
 function internal_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
     m = 0.5*(e.v1 + e.v2)
-    z = 0.5*(p.x + q.x)
+    #z = 0.5*(p.x + q.x)
     
     #=
     p.var.v += -(dt/p.var.mass)*lr_ratio(p,q,e)*(
@@ -181,10 +197,7 @@ function internal_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
         - 0.5*(p.var.P + q.var.P)*(p.x - q.x)
     )
     =#
-    p.var.v += (dt/p.var.mass)*lr_ratio(p,q,e)*(
-        +(p.var.P - q.var.P)*(m - z) 
-        + 0.5*(p.var.P + q.var.P)*(p.x - q.x)
-    )
+    p.var.v += (dt/p.var.mass)*lr_ratio(p,q,e)*(p.var.P - q.var.P)*(m - p.x)
     
     #mP = 0.5*poly_eval(p.var.P, p.var.P_taylor, m - p.x) + 0.5*(poly_eval(q.var.P, q.var.P_taylor, m - q.x))
     #p.var.v += (dt/p.var.mass)*lr_ratio(p,q,e)*mP*(p.x - q.x)
@@ -256,35 +269,35 @@ function solve(dr::Float64)
     #populate_rand!(grid, dr)
     #populate_square!(grid, dr)
     populate_vogel!(grid, dr)
+    #populate_lloyd!(grid, dr, randomness = 0.2, niterations = 5)
 
     @show dr
     @info "meshing"
     @time remesh!(grid)
-    apply_unary!(grid, identify_bdary!)
+    #apply_unary!(grid, identify_bdary!)
 
     #@info "exporting the initial state to a vtp file"
     #vtp_file = export_grid(grid, "results/projection/before_projection.vtp", :v, :P, :div)
     #vtk_save(vtp_file)
     
-    @info "moving ls"
-    @time moving_ls!(grid)
+    #@info "moving ls"
+    #@time moving_ls!(grid)
     
     #apply_binary!(grid, get_div!)
     #l2_div = sqrt(sum(p -> Float64(filter_fun(p))*area(p)*p.var.div^2, grid.polygons))
 
-    @info "assembly"
-    @time begin
-        apply_unary!(grid, get_invA!)
-        #apply_unary!(grid, wall_force!)
-        apply_binary!(grid, get_div!)
-        A, b = assemble_system(grid, diagonal_element, edge_element, vector_element)
-    end
 
-    @info "lin sys solving"
-    @time pressure_vector = A\b
-    
-    @info "pressure push"
+    apply_unary!(grid, get_invA!)
+
+    @info "calculating pressure"
     @time begin
+        
+        #apply_unary!(grid, wall_force!)
+        #=       
+        apply_binary!(grid, get_div!)
+        A, b = assemble_system(grid, diagonal_element, edge_element, vector_element, constrained_average = true)
+        pressure_vector = A\b
+        #pressure_vector, _ = minres(A, b)
         for i in eachindex(grid.polygons)
             p = grid.polygons[i]
             p.var.P = pressure_vector[p.id]
@@ -293,8 +306,18 @@ function solve(dr::Float64)
                 p.var.div = div_exact(p.x)
             end
         end
+        =#
+        
+        
+        solver = PressureSolver(grid)
+        find_pressure!(solver, dt)
+        
+    end
+    
+    @info "pressure push"
+    @time begin
         apply_binary!(grid, internal_force!)
-        #apply_unary!(grid, wall_force!)
+        apply_unary!(grid, wall_force!)
     end
 
     p_err = 0.0
@@ -337,7 +360,7 @@ function main()
         grid, P_err, v_err = solve(1.0/N)
         push!(P_errs, P_err)
         push!(v_errs, v_err)
-        pvd[N] = export_grid(grid, string(export_path, "/frame", N, ".vtp"), :v, :P, :v_exact, :P_exact, :div_exact, :div)
+        pvd[N] = export_grid(grid, string(export_path, "/frame", N, ".vtp"), :v, :P, :v_exact, :P_exact, :div_exact, :div, :isboundary)
     end
     vtk_save(pvd)
     logNs = log10.(Ns)

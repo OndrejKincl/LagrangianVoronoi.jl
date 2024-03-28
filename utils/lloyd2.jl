@@ -14,28 +14,22 @@ function centroid(p::VoronoiPolygon)::RealVector
 end
 
 function lloyd_relaxation!(p::VoronoiPolygon, tau_r::Float64)
-    p.var.lloyd_dx = VEC0
     if !isboundary(p)
         c = centroid(p)
-        p.var.lloyd_dx = dt/(tau_r + dt)*(c - p.x)
+        p.x += dt/(tau_r + dt)*(c - p.x)
     end
 end
 
-function lloyd_correction!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
-    m = 0.5*(e.v1 + e.v2)
-    p.var.lloyd_dv += lr_ratio(p,q,e)*dot(p.x - m, p.var.lloyd_dx)*(p.var.v - q.var.v)  
+function lloyd_acceleration!(p::VoronoiPolygon, tau_r::Float64, dt::Float64)
+    if !isboundary(p)
+        c = centroid(p)
+        p.var.v += dt/tau_r*(c - p.x)
+    end
 end
 
-function lloyd_update!(p::VoronoiPolygon)
-    p.var.v += p.var.lloyd_dv/area(p)
-    p.var.lloyd_dv = VEC0
-    p.x += p.var.lloyd_dx
-end
 
 function lloyd_stabilization!(grid::VoronoiGrid, tau_r::Float64)
     apply_unary!(grid, p -> lloyd_relaxation!(p, tau_r))
-    apply_binary!(grid, lloyd_correction!)
-    apply_unary!(grid, lloyd_update!)
 end
 
 
@@ -55,13 +49,13 @@ function populate_lloyd!(grid::VoronoiGrid, dr::Float64, charfun = (::RealVector
             end
         end
     end
+    remesh!(grid)
     #randomly push everything
     for p in grid.polygons
         if !isboundary(p)
             p.x += randomness*dr*((rand() - 0.5)*VECX + (rand() - 0.5)*VECY)
         end
     end
-
     remesh!(grid)
     # perform lloyd iterations
     for _ in 1:niterations
