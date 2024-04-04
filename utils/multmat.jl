@@ -2,6 +2,7 @@ import Base: eltype, size
 import LinearAlgebra: mul!
 using SparseArrays
 using Base.Threads
+using Polyester
 import Base: *
 import Base: similar, copyto!, fill!, pointer
 import LinearAlgebra: axpy!, rmul!, dot, norm
@@ -11,7 +12,7 @@ struct ThreadedMul{Tv,Ti}
 end
 
 function mul!(y::AbstractVector, M::ThreadedMul, x::AbstractVector)
-    @threads for i = 1 : M.A.n
+    @batch for i = 1 : M.A.n
         _threaded_mul!(y, M.A, x, i)
     end
     y
@@ -39,9 +40,8 @@ size(M::ThreadedMul, I...) = size(M.A, I...)
 
 struct ThreadedVec{T} <: DenseVector{T}
     val::Vector{T}
-    psums::Vector{T}
-    ThreadedVec(val::Vector{T}) where T = new{T}(val, zeros(T, Threads.nthreads()))
-    ThreadedVec{T}(::UndefInitializer, n::Int64) where T = new{T}(Vector{T}(undef, n), zeros(T, Threads.nthreads()))
+    ThreadedVec(val::Vector{T}) where T = new{T}(val)
+    ThreadedVec{T}(::UndefInitializer, n::Int64) where T = new{T}(Vector{T}(undef, n))
 end
 
 eltype(v::ThreadedVec) = eltype(v.val)
@@ -60,41 +60,66 @@ function similar(x::ThreadedVec, type::Type{T} = eltype(x.val), n::Integer = len
     return ThreadedVec(zeros(type, n))
 end
 
-function dot(x::ThreadedVec{T}, y::ThreadedVec{T})::T where T
-    fill!(x.psums, zero(eltype(x)))
-    @threads for i in eachindex(x.val)
-        @inbounds x.psums[Threads.threadid()] += x.val[i]*y.val[i]
+function dot(u::ThreadedVec{Float64}, v::ThreadedVec{Float64})::Float64
+ 
+    Nt = nthreads()
+    Lt = length(u) ÷ Nt
+    if length(u) != length(v)
+        throw(ArgumentError("vectors must have same dims"))
     end
-    return sum(x.psums, init = zero(eltype(x)))
+    # Calculate partial sums.
+    s = Vector{Task}(undef, nthreads()-1)
+    for j = 1:Nt-1  # last chunk is handled separately just in case length(v) is not multiple of Nt
+        lo = (j-1) * Lt + 1
+        hi = j * Lt
+        s[j] = @spawn begin
+            psum = 0.0
+            for i in lo:hi
+                @inbounds psum += u[i]*v[i]
+            end
+            return psum
+        end
+    end
+    # Add partial sums
+    lo_last = (Nt-1) * Lt + 1
+    stot = 0.0
+    for i in lo_last:length(u) # handle last chunk
+        @inbounds stot += u[i]*v[i]
+    end
+    for j = 1:Nt-1
+        stot += fetch(s[j])
+    end
+    return stot
+
+    return dot(u.val,v.val)
 end
 
-
-function norm(x::ThreadedVec{T})::T where T
+function norm(x::ThreadedVec{Float64})::Float64
     return sqrt(dot(x,x))
 end
 
-function axpy!(a::Number, x::ThreadedVec, y::ThreadedVec)::ThreadedVec
-    @threads for i in eachindex(x.val)
-        @inbounds y.val[i] += a*x.val[i]
+function axpy!(a::Number, x::ThreadedVec{T}, y::ThreadedVec{T})::ThreadedVec{T} where T
+    @batch for i in eachindex(x.val)
+        @inbounds y[i] += a*x[i]
     end
     return y
 end
 
-function copyto!(dst::ThreadedVec, src::ThreadedVec)
-    @threads for i in eachindex(dst.val)
-        @inbounds dst.val[i] = src.val[i]
+function copyto!(dst::ThreadedVec{T}, src::ThreadedVec{T}) where T
+    @batch for i in eachindex(dst.val)
+        @inbounds dst[i] = src[i]
     end
 end
 
-function fill!(x::ThreadedVec, val::Number)
-    @threads for i in eachindex(x.val)
-        @inbounds x.val[i] = val
+function fill!(x::ThreadedVec{T}, val::T) where T
+    @batch for i in eachindex(x.val)
+        @inbounds x[i] = val
     end
 end
 
-function rmul!(x::ThreadedVec, val::Number)
-    @threads for i in eachindex(x.val)
-        @inbounds x.val[i] *= val
+function rmul!(x::ThreadedVec{T}, val::T) where T
+    @batch for i in eachindex(x.val)
+        @inbounds x[i] *= val
     end
 end
 

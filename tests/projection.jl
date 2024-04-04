@@ -14,6 +14,7 @@ using Plots, LaTeXStrings
 using SmoothedParticles:rDwendland2
 using Parameters
 using Base.Threads
+using LimitedLDLFactorizations
 
 const DOMAIN = Rectangle(xlims = (0,1), ylims = (0,1))
 const dt = 1.0
@@ -51,7 +52,7 @@ end
 
 include("../utils/isolver.jl")
 include("../utils/lloyd2.jl")
-include("../utils/parallel_settings.jl")
+#include("../utils/parallel_settings.jl")
 
 function v_init(x::RealVector)::RealVector
     vx = -x[1]*(x[1] - 1.0)*(x[2] - 0.5) - pi*sin(pi*x[1])*cos(pi*x[2])
@@ -264,6 +265,30 @@ function moving_ls!(grid::VoronoiGrid)
     return
 end
 
+include("../utils/multmat.jl")
+include("../utils/parcg.jl")
+function solver_bench()
+    dr = 1/300
+    grid = VoronoiGrid{PhysFields}(2*dr, DOMAIN)
+    populate_vogel!(grid, dr)
+    remesh!(grid)
+    apply_unary!(grid, get_invA!)
+    apply_binary!(grid, get_div!)
+    A, b = assemble_system(grid, diagonal_element, edge_element, vector_element, constrained_average = false)
+    @show size(A)
+
+    begin
+        _A = ThreadedMul(A)
+        _b = ThreadedVec(b)
+        solver = CgSolver(_A, _b)
+        cg!(solver, _A, _b)
+        @time cg!(solver, _A, _b)
+        @time cg!(solver, _A, _b)
+        @time cg!(solver, _A, _b)
+        x = solution(solver)
+    end
+end
+
 function solve(dr::Float64)
     grid = VoronoiGrid{PhysFields}(2*dr, DOMAIN)
     #populate_rand!(grid, dr)
@@ -290,14 +315,13 @@ function solve(dr::Float64)
     apply_unary!(grid, get_invA!)
 
     @info "calculating pressure"
-    @time begin
+    begin
         
         #apply_unary!(grid, wall_force!)
-        #=       
+            
         apply_binary!(grid, get_div!)
-        A, b = assemble_system(grid, diagonal_element, edge_element, vector_element, constrained_average = true)
-        pressure_vector = A\b
-        #pressure_vector, _ = minres(A, b)
+        A, b = assemble_system(grid, diagonal_element, edge_element, vector_element, constrained_average = false)
+        @time pressure_vector = A\b
         for i in eachindex(grid.polygons)
             p = grid.polygons[i]
             p.var.P = pressure_vector[p.id]
@@ -306,11 +330,11 @@ function solve(dr::Float64)
                 p.var.div = div_exact(p.x)
             end
         end
-        =#
         
         
-        solver = PressureSolver(grid)
-        find_pressure!(solver, dt)
+        
+        #solver = PressureSolver(grid)
+        #find_pressure!(solver, dt)
         
     end
     
@@ -386,5 +410,11 @@ function main()
     println("v slope = ", b_v[1])
     
 end
+
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    solver_bench()
+end
+
 
 end

@@ -60,11 +60,11 @@ end
 
 @inbounds function remesh!(grid::VoronoiGrid)::Nothing
     # clear the cell list
-    @threads for cell in grid.cell_list.cells
+    @batch for cell in grid.cell_list.cells
         empty!(cell)
     end
     # reset voronoi cells
-    @threads for i in eachindex(grid.polygons)
+    @batch for i in eachindex(grid.polygons)
         poly = grid.polygons[i]
         # remember old neighbors
         neighbors = _getNeighbors(grid, poly)
@@ -78,9 +78,9 @@ end
         insert!(grid.cell_list, poly.x, i)
     end
     # cut all voronoi cells
-    @threads for i in eachindex(grid.polygons)
+    @batch for i in eachindex(grid.polygons)
         voronoicut!(grid, grid.polygons[i])
-        normalize!(grid.polygons[i])
+        sort_edges!(grid.polygons[i])
     end
     return
 end

@@ -67,3 +67,19 @@ function populate_vogel!(grid::VoronoiGrid{T}, dr::Float64; charfun = (::RealVec
     remesh!(grid)
 	return
 end
+
+function populate_lloyd!(grid::VoronoiGrid{T}, dr::Float64; charfun = (::RealVector -> true), niterations = 10) where T
+    populate_rand!(grid, dr, charfun=charfun)
+    remesh!(grid)
+    cs = zeros(RealVector, length(grid.polygons))
+    for it in 1:niterations
+        for (i,p) in enumerate(grid.polygons)
+            cs[i] = centroid(p)
+        end
+        for (i,p) in enumerate(grid.polygons)
+            p.x = cs[i]
+        end
+        remesh!(grid)
+    end
+	return
+end

@@ -31,7 +31,7 @@ function assemble_system(
     I = [Int[] for _ in 1:Threads.nthreads()]
     J = [Int[] for _ in 1:Threads.nthreads()]
     V = [Float64[] for _ in 1:Threads.nthreads()]
-    @threads for p in grid.polygons
+    @batch for p in grid.polygons
         if !filter(p)
             continue
         end
@@ -57,7 +57,7 @@ function assemble_system(
     end
     if constrained_average
         push!(rhs, 0.0)
-        @threads for j in 1:N
+        @batch for j in 1:N
             push_matrix_element!(I, J, V, N+1, j, 1.0)
         end
         N += 1

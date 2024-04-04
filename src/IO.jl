@@ -11,7 +11,7 @@ function export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
     verts = Vector{SVector{3, Float64}}()
     polys = Vector{MeshCell{PolyData.Polys}}()
     for poly in grid.polygons
-        normalize!(poly)
+        sort_edges!(poly)
         # construct the meshcell
         n0 = length(verts)
         if !poly.isbroken
@@ -33,7 +33,7 @@ function export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
     return vtk
 end
 
-function normalize!(poly::VoronoiPolygon)
+function sort_edges!(poly::VoronoiPolygon)
     # reorder the edges to connect them
     for i in 1:length(poly.edges)
         last_vert = poly.edges[i].v2

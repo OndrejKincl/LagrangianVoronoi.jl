@@ -2,7 +2,7 @@ function apply_unary!(grid::VoronoiGrid, fun::Function)
     if !hasmethod(fun, (VoronoiPolygon, ))
         throw(ArgumentError("functional argument must be fun(::VoronoiPolygon)"))
     end
-    @threads for p in grid.polygons
+    @batch for p in grid.polygons
         fun(p)
     end
 end
@@ -11,7 +11,7 @@ function apply_binary!(grid::VoronoiGrid, fun::Function)
     if !hasmethod(fun, (VoronoiPolygon, VoronoiPolygon, Edge))
         throw(ArgumentError("functional argument must be fun(::VoronoiPolygon, ::VoronoiPolygon, ::Edge)"))
     end    
-    @threads for p in grid.polygons
+    @batch for p in grid.polygons
         for e in p.edges
             if isboundary(e)
                 continue
@@ -29,7 +29,7 @@ function apply_local!(grid::VoronoiGrid, fun::Function, threshold_dist::Float64)
     if !hasmethod(fun, (VoronoiPolygon, VoronoiPolygon, Float64))
         throw(ArgumentError("functional argument must be fun(::VoronoiPolygon, ::VoronoiPolygon, ::Float64)"))
     end 
-    @threads for p in grid.polygons
+    @batch for p in grid.polygons
         x = p.x
         key0 = findkey(grid.cell_list, x)
         for node in grid.cell_list.magic_path

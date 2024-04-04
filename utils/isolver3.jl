@@ -78,36 +78,3 @@ function no_slip!(p::VoronoiPolygon)
         p.var.v = VEC0
     end
 end
-
-function tri_area(a::RealVector, b::RealVector, c::RealVector)::Float64
-    return 0.5*abs(LagrangianVoronoi.cross2(b - a, c - a))
-end
-
-function centroid(p::VoronoiPolygon)::RealVector
-    A = 0.0
-    c = VEC0
-    for e in p.edges
-        dA = tri_area(p.x, e.v1, e.v2)
-        A += dA
-        c += dA*(p.x + e.v1 + e.v2)/3
-    end
-    return c/A
-end
-
-
-function stabilize!(grid::VoronoiGrid)
-    @threads for p in grid.polygons
-        LapP = 0.0 #laplacian of pressure
-        for e in p.edges
-            if isboundary(e)
-                continue
-            end
-            q = grid.polygons[e.label]
-            LapP -= lr_ratio(p,q,e)*(p.var.P - q.var.P)
-        end
-        if LapP > 0.0
-            c = centroid(p)
-            p.var.a += 1.5*LapP/(p.var.mass)*(c - p.x)
-        end
-    end
-end

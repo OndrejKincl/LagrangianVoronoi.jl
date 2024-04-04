@@ -2,7 +2,7 @@ module gresho
 
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using SmoothedParticles:rDwendland2
-using LaTeXStrings, DataFrames, CSV, Plots
+using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
 
 include("../src/LagrangianVoronoi.jl")
@@ -18,12 +18,15 @@ const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
 const tau_r = l_char/v_char
-const t_end =  3.0
-const nframes = 50
+const t_end =  1.0
+const nframes = 100
 
 const h = 2.0*dr
 
-const export_path = "results/gresho3"
+const P_stab = 0.01*rho0*v_char^2
+const h_stab = 2.0*dr
+
+const export_path = "results/gresho2"
 
 include("../utils/parallel_settings.jl")
 #include("../utils/lloyd.jl")
@@ -38,7 +41,7 @@ include("../utils/parallel_settings.jl")
     lloyd_dx::RealVector = VEC0
     lloyd_dv::RealVector = VEC0
 end
-include("../utils/isolver3.jl")
+include("../utils/isolver.jl")
 
 
 function PhysFields(x::RealVector)
@@ -71,6 +74,12 @@ function find_energy(grid::VoronoiGrid)::Float64
     end
     return E
 end
+
+
+function stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
+	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
+end
+
 
 function stabilization_test()
     domain = Rectangle(xlims = xlims, ylims = ylims)
@@ -116,9 +125,11 @@ function main()
         apply_unary!(grid, move!)
         #lloyd_stabilization!(grid, tau_r)
         remesh!(grid)
+        #apply_local!(grid, stabilizer!, h_stab)
         #apply_unary!(grid, get_mass!)
-        apply_unary!(grid, no_slip!)
         #stabilize!(grid)
+        #apply_unary!(grid, accelerate!)
+        apply_unary!(grid, no_slip!)
         try
             find_pressure!(solver, dt)
         catch e
@@ -127,6 +138,7 @@ function main()
             throw(e)
         end
         apply_binary!(grid, internal_force!)
+        #stabilize!(grid)
         apply_unary!(grid, accelerate!)
         apply_unary!(grid, no_slip!)
         if ((k_end - k) % k_frame == 0)
@@ -164,6 +176,41 @@ function main()
 end
 
 
+function tri_area(a::RealVector, b::RealVector, c::RealVector)::Float64
+    return 0.5*abs(LagrangianVoronoi.cross2(b - a, c - a))
+end
+
+function centroid(p::VoronoiPolygon)::RealVector
+    A = 0.0
+    c = VEC0
+    for e in p.edges
+        dA = tri_area(p.x, e.v1, e.v2)
+        A += dA
+        c += dA*(p.x + e.v1 + e.v2)/3
+    end
+    return c/A
+end
+
+
+function stabilize!(grid::VoronoiGrid)
+    @threads for p in grid.polygons
+        LapP = 0.0 #laplacian of pressure
+        for e in p.edges
+            if isboundary(e)
+                continue
+            end
+            q = grid.polygons[e.label]
+            LapP -= lr_ratio(p,q,e)*(p.var.P - q.var.P)
+        end
+        if LapP > 0.0
+            c = centroid(p)
+            p.var.a += 1.5*LapP/(p.var.mass)*(c - p.x)
+        end
+    end
+end
+
+
+
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
     plt = plot(
@@ -173,7 +220,8 @@ function plot_midline()
         xlabel = L"x",
         ylabel = L"v_y",
         color = :blue,
-        linestyle = :dash
+        linestyle = :dash,
+        bottom_margin = 5mm
     )
     plot!(
         plt,

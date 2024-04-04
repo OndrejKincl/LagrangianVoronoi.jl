@@ -1,6 +1,7 @@
 module voroplots
 
-using Plots, LaTeXStrings
+using Plots; pgfplotsx()
+using LaTeXStrings, Measures
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
@@ -11,19 +12,23 @@ end
 
 function draw_grid!(plt, grid)
     for p in grid.polygons
-        verts = [(e.v1[1], e.v1[2]) for e in p.edges]
-        push!(verts, verts[1])
-        poly = Shape(verts)
-        if p.var.select
-            plot!(plt, poly, fillcolor = plot_color(:darkorange1, 0.5))
-        else
-            plot!(plt, poly, fillcolor = plot_color(:royalblue1, 0.5))
-        end
+        draw_polygon!(plt, p)
     end
     for (i,p) in enumerate(grid.polygons)
         annotate!(plt, p.x[1], p.x[2]-0.05, latexstring("\\mathbf{x}_{", i, "}"), :black)
     end
     scatter!(plt, [p.x[1] for p in grid.polygons], [p.x[2] for p in grid.polygons], mc = :black)
+end
+
+function draw_polygon!(plt, p)
+    verts = [(e.v1[1], e.v1[2]) for e in p.edges]
+    push!(verts, verts[1])
+    poly = Shape(verts)
+    if p.var.select
+        plot!(plt, poly, fillcolor = plot_color(:darkorange1, 0.5))
+    else
+        plot!(plt, poly, fillcolor = plot_color(:royalblue1, 0.5))
+    end
 end
 
 # a Voronoi mesh of non-convex domain, where the derivative of Omega_1 wrt x_2 is undefined
@@ -85,6 +90,95 @@ function compress()
     savefig(plt, "results/compress2.pdf")
     A = area(grid.polygons[1])
     @show A
+end
+
+function draw_cell!(plt, cell_list, key, highlight = false)
+    i = key[1]
+    j = key[2]
+    ox = cell_list.origin[1]
+    oy = cell_list.origin[2]
+    h = cell_list.h
+    x0 = ox + h*(i-1)
+    x1 = x0 + h
+    y0 = oy + h*(j-1)
+    y1 = y0 + h
+    verts = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    push!(verts, verts[1])
+    if highlight
+        plot!(plt, verts, color = :red, lw = 1)
+    else
+        plot!(plt, verts, color = plot_color(:black, 0.1), lw = 1)
+    end
+end
+
+function draw_cell_list!(plt, cell_list)
+    for key in CartesianIndices(cell_list.cells)
+        draw_cell!(plt, cell_list, key)
+    end
+end
+
+
+function mesh_construction()
+    lims = (-0.5, 0.5)
+    dr = 0.1
+    grid = VoronoiGrid{Fields}(2*dr, Rectangle(xlims = lims, ylims = lims))
+    
+    #push!(grid.polygons, VoronoiPolygon{Fields}(VEC0))
+    populate_vogel!(grid, dr)
+    p0 = grid.polygons[1]
+    LagrangianVoronoi.reset!(p0, grid.boundary_rect)
+    x = p0.x
+    prr = LagrangianVoronoi.influence_rr(p0)
+    key0 = LagrangianVoronoi.findkey(grid.cell_list, x)
+    frame = 0
+    for node in grid.cell_list.magic_path
+
+        rr = node.rr
+        offset = node.key
+        if (rr > prr)
+            break
+        end
+        key = key0 + offset
+
+        plt = plot(axis_ratio = 1.0, legend = :none, xlims = (-0.25, 0.25), ylims = (-0.25, 0.25), grid = :none, axis=([], false))
+        LagrangianVoronoi.normalize!(p0)
+        draw_polygon!(plt, p0)
+        scatter!(plt, [p.x[1] for p in grid.polygons], [p.x[2] for p in grid.polygons], mc = :black, ms = 4)
+        scatter!(plt, [p0.x[1]], [p0.x[2]], mc = :orange, ms = 6, markershape = :hex)
+        active_ps = []
+        for p in grid.polygons
+            if p != p0 && LagrangianVoronoi.findkey(grid.cell_list, p.x) == key
+                push!(active_ps, p)
+            end
+        end
+        draw_cell_list!(plt, grid.cell_list)
+        if frame < 5
+            draw_cell!(plt, grid.cell_list, key, true)
+            scatter!(plt, [p.x[1] for p in active_ps], [p.x[2] for p in active_ps], mc = :red, ms = 4)
+        end
+        savefig(plt, "results/mesh_construction/frame$(frame).pdf")
+        frame += 1
+
+        if !(checkbounds(Bool, grid.cell_list.cells, key))
+            continue
+        end
+        for i in grid.cell_list.cells[key]
+            y = grid.polygons[i].x
+            if (p0.x == y) || (norm_squared(p0.x-y) > prr)
+                continue
+            end
+            if LagrangianVoronoi.voronoicut!(p0, y, i)
+                prr = LagrangianVoronoi.influence_rr(p0)
+            end
+        end
+    end
+    
+end
+
+function make_colorbar(x_start, x_end, label)
+    data = [(i-1)/9*x_start + (10-i)/9*x_end for i in 1:10, j in 1:10]
+    plt = heatmap(1:10, 1:10, data, colorbar = :top, cmap = :coolwarm, colorbar_title = label, colorbar_titlefontsize=40, right_margin = 50mm)
+    savefig(plt, "colormap.pdf")
 end
 
 end

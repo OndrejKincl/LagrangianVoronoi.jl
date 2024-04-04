@@ -166,3 +166,18 @@ end
     end
     return wn != 0
 end
+
+function tri_area(a::RealVector, b::RealVector, c::RealVector)::Float64
+    return 0.5*abs(LagrangianVoronoi.cross2(b - a, c - a))
+end
+
+function centroid(p::VoronoiPolygon)::RealVector
+    A = 0.0
+    c = VEC0
+    for e in p.edges
+        dA = tri_area(p.x, e.v1, e.v2)
+        A += dA
+        c += dA*(p.x + e.v1 + e.v2)/3
+    end
+    return c/A
+end
