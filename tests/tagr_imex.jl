@@ -18,6 +18,8 @@ const nframes = 5
 const l_char = 1.0
 const v_char = 1.0
 
+const lambda = 1
+const P_stab = 1e-2
 
 export_path = "results/tagr_imex"
 
@@ -44,19 +46,23 @@ function PhysFields(x::RealVector)
 end
 
 function v_exact(x::RealVector)::RealVector
-    u =  cos(pi*x[1])*sin(pi*x[2])
-    v = -sin(pi*x[1])*cos(pi*x[2])
+    u =  cos(lambda*pi*x[1])*sin(lambda*pi*x[2])
+    v = -sin(lambda*pi*x[1])*cos(lambda*pi*x[2])
     return u*VECX + v*VECY
 end
 
 function a_exact(x::RealVector)::RealVector
-    ax = -pi*sin(pi*x[1])*cos(pi*x[1])
-    ay = -pi*sin(pi*x[2])*cos(pi*x[2])
+    ax = -lambda*pi*sin(lambda*pi*x[1])*cos(lambda*pi*x[1])
+    ay = -lambda*pi*sin(lambda*pi*x[2])*cos(lambda*pi*x[2])
     return ax*VECX + ay*VECY
 end
 
 function P_exact(x::RealVector)::Float64
-    return 0.5*(sin(pi*x[1])^2 + sin(pi*x[2])^2 - 1.0)
+    return 0.5*(sin(lambda*pi*x[1])^2 + sin(lambda*pi*x[2])^2 - 1.0)
+end
+
+function boundary_filter(x::RealVector)::Bool
+    return max(abs(x[1]), abs(x[2])) > 0.4
 end
 
 export_vars = (:v, :P)
@@ -66,34 +72,42 @@ function get_errors(grid::VoronoiGrid)
     v_error = 0.0
     E_error = -0.5
     for p in grid.polygons
+        E_error += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
+        if boundary_filter(p.x)
+            continue
+        end
         v_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x))
         P_error += area(p)*(p.var.P - P_exact(p.x))^2
-        E_error += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
     end
     return (E_error, sqrt(v_error), sqrt(P_error))
 end
 
 # implicit-explit midpoint
-function ie_midpoint_init!(grid::VoronoiGrid, dt::Float64)
+function init!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
     @batch for p in grid.polygons
         p.var.x_old = p.x
         p.var.v_old = p.var.v
-        p.var.a_old = a_exact(p.x)
-        v_ = v_exact(p.x + dt*p.var.v)
-        p.x += 0.5*dt*(p.var.v + v_)
-        p.var.v = v_exact(p.x)
-        p.var.a = a_exact(p.x)
+        p.var.a_old = p.var.a
+        p.x += dt*p.var.v
+        p.var.a = VEC0
     end
     remesh!(grid)
+    apply_unary!(grid, get_mass!)
+    find_pressure!(solver, dt)
+    apply_binary!(grid, internal_force!)
+    stabilize!(grid)
+    @batch for p in grid.polygons
+        p.var.v += dt*p.var.a
+    end
 end
 
-function ie_midpoint_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
+function midpoint_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
     # new positions
     @batch for p in grid.polygons
-        tmp = p.var.x_old + 2*dt*p.var.v
+        x = p.var.x_old + 2*dt*p.var.v
         p.var.x_old = p.x
-        if isinside(grid.boundary_rect, tmp)
-            p.x = tmp
+        if isinside(grid.boundary_rect, x)
+            p.x = x
         end
     end
     remesh!(grid)
@@ -106,12 +120,47 @@ function ie_midpoint_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolve
         p.var.a = VEC0
     end
     # the implicit step
+    apply_unary!(grid, get_mass!)
     find_pressure!(solver, dt)
     apply_binary!(grid, internal_force!)
-    #stabilize!(grid)
+    stabilize!(grid)
     @batch for p in grid.polygons
         p.var.v += dt*p.var.a
+        #p.var.v = v_exact(p.x)
     end
+end
+
+function cnab_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
+    # new positions
+    @batch for p in grid.polygons
+        x = p.x + 1.5*dt*p.var.v - 0.5*dt*p.var.v_old
+        if !isinside(grid.boundary_rect, x)
+            p.x = x
+        end
+    end
+    remesh!(grid)
+    # intermediate velocity
+    @batch for p in grid.polygons
+        p.var.v_old = p.var.v
+        p.var.v += 0.5*dt*p.var.a
+        p.var.a = VEC0
+    end
+    # the implicit step
+    h_stab = grid.h
+    #apply_local!(grid, (p,q,r) -> stabilizer!(p,q,r,h_stab,dt), h_stab)
+    #apply_unary!(grid, no_slip!)
+    find_pressure!(solver, 0.5*dt)
+    apply_binary!(grid, internal_force!)
+    stabilize!(grid)
+    @batch for p in grid.polygons
+        p.var.v += 0.5*dt*p.var.a
+        #p.var.v = v_exact(p.x)
+    end
+    #apply_unary!(grid, no_slip!)
+end
+
+function stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, h_stab::Float64, dt::Float64)
+	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
 end
 
 
@@ -124,11 +173,12 @@ function solve(N::Int)
 
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
-    #populate_vogel!(grid, dr, center = 0.5*VECX + 0.5*VECY)
-    #Random.seed!(123)
-    populate_lloyd!(grid, dr, niterations = 20)
-    #populate_rect!(grid, dr)
-    apply_unary!(grid, get_mass!)
+    #populate_vogel!(grid, dr)
+    Random.seed!(123)
+    #populate_lloyd!(grid, dr, niterations = 100)
+    #populate_circ!(grid, dr)
+    populate_rect!(grid, dr)
+    #apply_unary!(grid, get_mass!)
 
     nframe = 0
     E_errors = Float64[]
@@ -140,9 +190,12 @@ function solve(N::Int)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
 
     solver = PressureSolver(grid)
-    ie_midpoint_init!(grid, dt)
-    @time for k = 0 : k_end
-        ie_midpoint_step!(grid, dt, solver)
+    @time for k = 1 : k_end
+        if k < 3
+            init!(grid, dt, solver)
+        else
+            cnab_step!(grid, dt, solver)
+        end
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -186,7 +239,7 @@ function main()
         @info "created a new path \""*export_path*"\""
     end 
     pvd = paraview_collection(export_path*"/cells.pvd")
-    Ns = [32, 48, 72, 108] #, 162, 243]
+    Ns = [32, 48, 72, 108]#,  162, 243]
     E_errs = []
     v_errs = []
     P_errs = []
@@ -204,7 +257,7 @@ function main()
     logE_errs = log10.(E_errs)
     plt = plot(
         logNs, [logE_errs logv_errs logP_errs], 
-        axis_ratio = 1, 
+        #axis_ratio = 1, 
         xlabel = L"\log \, N", ylabel = L"\log \, \epsilon", 
         markershape = :hex, 
         label = ["energy" "velocity" "pressure"]

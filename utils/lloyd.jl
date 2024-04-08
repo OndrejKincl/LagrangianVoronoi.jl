@@ -36,6 +36,7 @@ function lloyd_stabilization!(grid::VoronoiGrid, tau_r::Float64)
     apply_unary!(grid, p -> lloyd_relaxation!(p, tau_r))
     apply_binary!(grid, lloyd_correction!)
     apply_unary!(grid, lloyd_update!)
+    remesh!(grid)
 end
 
 

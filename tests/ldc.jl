@@ -10,7 +10,7 @@ using .LagrangianVoronoi
 
 
 
-const Re = 100
+const Re = 400
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
@@ -20,7 +20,7 @@ const dr = 1.0/N
 
 const dt = min(0.1*dr, 0.1*Re*dr^2)
 const tau = 0.1
-const t_end = 10.0
+const t_end = 40.0
 const nframes = 100
 
 const h = 2.0*dr
@@ -31,7 +31,7 @@ const h = 2.0*dr
 #const h_stab = 2.0*dr
 #const dirichlet_eps = 0.1*dr
 
-const export_path = "results/ldc2"
+const export_path = "results/ldc3200"
 
 include("../utils/parallel_settings.jl")
 #include("../utils/lloyd.jl")
@@ -125,7 +125,7 @@ function main()
     @time for k = 0 : k_end
         try
             move!(grid, dt)
-            lloyd_step!(grid, tau)
+            #lloyd_step!(grid, tau)
             remesh!(grid)
             #apply_local!(grid, stabilizer!, h_stab)
             apply_binary!(grid, viscous_force!)
@@ -222,20 +222,20 @@ function make_plot(Re=Re)
 		data.s, data.v2,
 		xlabel = L"x, y",
 		ylabel = L"u, v",
-		label = L"\mathrm{SILVA} \; u",
+		label = "ILVA "*L"u",
 		linewidth = 2,
 		legend = :topleft,
 		color = :orange,
 	)
-	scatter!(p1, ref_x, ref_vy, label = L"\mathrm{Ghia} \; u", color = :orange, markersize = 4, markerstroke = stroke(1, :black), markershape = :circ)
+	scatter!(p1, ref_x, ref_vy, label = "Ghia "*L"u", color = :orange, markersize = 4, markerstroke = stroke(1, :black), markershape = :circ)
 	#savefig(p1, export_path*"/ldc-x2vy.pdf")    
 	plot!(p1,
 		data.s, data.v1,
-        label = L"\mathrm{SILVA} \; v",
+        label = "ILVA "*L"v",
 		linewidth = 2,
-		color = :lightblue,
+		color = :royalblue,
 	)
-	scatter!(p1, ref_y, ref_vx, label = L"\mathrm{Ghia} \; v", color = :lightblue, markersize = 4, markerstroke = stroke(1, :black), markershape = :square)
+	scatter!(p1, ref_y, ref_vx, label = "Ghia "*L"v", color = :royalblue, markersize = 4, markerstroke = stroke(1, :black), markershape = :square)
 	savefig(p1, export_path*"/ldc.pdf")
 end
 

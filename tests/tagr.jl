@@ -19,6 +19,7 @@ const l_char = 1.0
 const v_char = 1.0
 
 
+
 export_path = "results/tagr"
 
 include("../utils/parallel_settings.jl")
@@ -49,6 +50,16 @@ function P_exact(x::RealVector)::Float64
     return 0.5*(sin(pi*x[1])^2 + sin(pi*x[2])^2 - 1.0)
 end
 
+function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, h_stab::Float64, dt::Float64, P0::Float64)
+	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P0/rho0^2)*(p.x - q.x)
+end
+
+export_vars = (:v, :P)
+
+function boundary_filter(x::RealVector)::Bool
+    return max(abs(x[1]), abs(x[2])) > 0.4
+end
+
 export_vars = (:v, :P)
 
 function get_errors(grid::VoronoiGrid)
@@ -56,26 +67,30 @@ function get_errors(grid::VoronoiGrid)
     v_error = 0.0
     E_error = -0.5
     for p in grid.polygons
+        E_error += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
+        if boundary_filter(p.x)
+            continue
+        end
         v_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x))
         P_error += area(p)*(p.var.P - P_exact(p.x))^2
-        E_error += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
     end
     return (E_error, sqrt(v_error), sqrt(P_error))
 end
 
-function solve(N::Int)
+function solve(N::Int, stabilize::Bool)
     dr = 1.0/N
     dt = 0.2*dr
     h = 2.0*dr
-
+    P0 = dr
     @show N
 
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
-    #populate_vogel!(grid, dr, center = 0.5*VECX + 0.5*VECY)
+    #populate_vogel!(grid, dr)
+    populate_rect!(grid, dr)
     #Random.seed!(123)
     #populate_lloyd!(grid, dr, niterations = 20)
-    populate_rect!(grid, dr)
+    #populate_circ!(grid, dr)
     apply_unary!(grid, get_mass!)
 
     nframe = 0
@@ -90,26 +105,30 @@ function solve(N::Int)
     solver = PressureSolver(grid)
     @time for k = 0 : k_end
         move!(grid, dt)
+        #lloyd_step!(grid, tau)
         remesh!(grid)
+        #apply_local!(grid, stabilizer!, h_stab)
+        #apply_binary!(grid, viscous_force!)
+        #apply_unary!(grid, wall!)
         accelerate!(grid, dt)
         find_pressure!(solver, dt)
         apply_binary!(grid, internal_force!)
         stabilize!(grid)
         accelerate!(grid, dt)
         if ((k_end - k) % k_frame == 0)
-            t = k*dt
-            @show t
-            push!(time, t)
-            E_error, v_error, P_error = get_errors(grid)
-            push!(v_errors, v_error)
-            push!(P_errors, P_error)
-            push!(E_errors, E_error)
-            @show v_error
-            @show P_error
-            @show E_error
-            nframe += 1
+                t = k*dt
+                @show t
+                push!(time, t)
+                E_error, v_error, P_error = get_errors(grid)
+                push!(v_errors, v_error)
+                push!(P_errors, P_error)
+                push!(E_errors, E_error)
+                @show v_error
+                @show P_error
+                @show E_error
+                nframe += 1
+            end
         end
-    end
 
     #compute_fluxes(grid)
     #make_plot()
@@ -133,52 +152,57 @@ function solve(N::Int)
 end
 
 
+function linear_reg!(plt, x, y, label, color)
+    N = length(x)
+    logx = log.(x)
+    logy = log.(y)
+    A = [logx ones(N)]
+    b = A\logy
+    logY = [b[1]*logx[i] + b[2] for i in 1:N]
+    @show label
+    @show b[1]
+    plot!(plt,
+        logx, logy,
+        markershape = :hex, 
+        label = label*" (slope = $(round(b[1], sigdigits=3)))",
+        color = color
+    )
+    plot!(plt, 
+        logx, logY, linestyle = :dot, 
+        label = :none,
+        color = color
+    )
+    return
+end
+
 function main()
     if !ispath(export_path)
         mkpath(export_path)
         @info "created a new path \""*export_path*"\""
     end 
     pvd = paraview_collection(export_path*"/cells.pvd")
-    Ns = [32, 48, 72, 108, 162, 243]
+    Ns = [16, 32, 48, 72, 108, 162, 243]
+    Ncells = []
     E_errs = []
     v_errs = []
     P_errs = []
     for N in Ns
-        grid, E_err, v_err, P_err = solve(N)
+        grid, E_err, v_err, P_err = solve(N, true)
         push!(E_errs, abs(E_err))
         push!(v_errs, v_err)
         push!(P_errs, P_err)
+        push!(Ncells, length(grid.polygons))
         pvd[N] = export_grid(grid, string(export_path, "/frame", N, ".vtp"), :v, :P)
     end
     vtk_save(pvd)
-    logNs = log10.(Ns)
-    logP_errs = log10.(P_errs)
-    logv_errs = log10.(v_errs)
-    logE_errs = log10.(E_errs)
     plt = plot(
-        logNs, [logE_errs logv_errs logP_errs], 
         axis_ratio = 1, 
-        xlabel = L"\log \, N", ylabel = L"\log \, \epsilon", 
-        markershape = :hex, 
-        label = ["energy" "velocity" "pressure"]
+        xlabel = L"\log \, N", ylabel = L"\log \, \epsilon"
     )
-    # linear regression
-    A = [logNs ones(length(Ns))]
-    b_P = A\logP_errs
-    logP_errs_reg = [b_P[1]*logNs[i] + b_P[2] for i in 1:length(Ns)]
-    b_v = A\logv_errs
-    logv_errs_reg = [b_v[1]*logNs[i] + b_v[2] for i in 1:length(Ns)]
-    b_E = A\logE_errs
-    logE_errs_reg = [b_E[1]*logNs[i] + b_E[2] for i in 1:length(Ns)]
-
-    plot!(plt, logNs, logE_errs_reg, linestyle = :dot, label = string("E slope = ", round(b_E[1], sigdigits=3)))
-    plot!(plt, logNs, logv_errs_reg, linestyle = :dot, label = string("v slope = ", round(b_v[1], sigdigits=3)))
-    plot!(plt, logNs, logP_errs_reg, linestyle = :dot, label = string("p slope = ", round(b_P[1], sigdigits=3)))
+    linear_reg!(plt, Ns, E_errs, "energy error", :orange)
+    linear_reg!(plt, Ns, P_errs, "pressure error", :royalblue)
+    linear_reg!(plt, Ns, v_errs, "velocity error", :purple)
     savefig(plt, export_path*"/convergence.pdf")
-    
-    println("E slope = ", b_E[1])
-    println("v slope = ", b_v[1])
-    println("P slope = ", b_P[1])
     
 end
 

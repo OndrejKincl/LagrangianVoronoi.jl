@@ -173,7 +173,7 @@ end
 function find_pressure!(solver::PressureSolver, dt::Float64;
     constant_density::Bool = false)
     refresh!(solver, dt, constant_density)
-    minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose)) #, M = solver.M)
+    minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), M = solver.M)
     x = solution(solver.ms)
     polygons = solver.grid.polygons
     @threads for i in eachindex(x)
@@ -185,14 +185,35 @@ function get_mass!(p::VoronoiPolygon)
     p.var.mass = p.var.rho*area(p)
 end
 
-function move!(p::VoronoiPolygon)
-    p.x += dt*p.var.v
+function move!(grid::VoronoiGrid, dt::Float64)
+    @batch for p in grid.polygons
+        new_x = p.x + dt*p.var.v
+        if isinside(grid.boundary_rect, new_x)
+            p.x = new_x
+        else # try to project v to tangent space
+            for e in p.edges
+                if isboundary(e)
+                    n = normal_vector(e)
+                    p.var.v -= dot(p.var.v, n)*n
+                end
+            end
+            new_x = p.x + dt*p.var.v
+            if isinside(grid.boundary_rect, new_x)
+                p.x = new_x
+            else # give up and halt the particle
+                p.var.v = VEC0
+            end
+        end
+    end
 end
 
-function accelerate!(p::VoronoiPolygon)
-    p.var.v += dt*p.var.a
-    p.var.a = VEC0
+function accelerate!(grid::VoronoiGrid, dt::Float64)
+    @batch for p in grid.polygons
+        p.var.v += dt*p.var.a
+        p.var.a = VEC0
+    end
 end
+
 
 function internal_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
     m = 0.5*(e.v1 + e.v2)

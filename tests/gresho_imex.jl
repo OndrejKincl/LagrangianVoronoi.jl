@@ -17,15 +17,16 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.1*dr/v_char
-const tau_r = 0.2*l_char/v_char
-const t_end =  3.0
+const tau_r = l_char/v_char
+const t_end =  1.0
 const nframes = 100
 
 const h = 2.0*dr
-const export_path = "results/gresho"
 
-const h_stab = h
 const P_stab = 0.01*rho0*v_char^2
+const h_stab = 2.0*dr
+
+const export_path = "results/gresho_imex"
 
 include("../utils/parallel_settings.jl")
 include("../utils/lloyd.jl")
@@ -37,6 +38,9 @@ include("../utils/lloyd.jl")
     a::RealVector = VEC0
     P::Float64 = 0.0
     rho::Float64 = rho0
+    x_old::RealVector = VEC0
+    v_old::RealVector = VEC0
+    a_old::RealVector = VEC0
     lloyd_dx::RealVector = VEC0
     lloyd_dv::RealVector = VEC0
 end
@@ -74,31 +78,103 @@ function find_energy(grid::VoronoiGrid)::Float64
     return E
 end
 
+function init!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
+    @batch for p in grid.polygons
+        p.var.x_old = p.x
+        p.var.v_old = p.var.v
+        p.var.a_old = p.var.a
+        p.x += dt*p.var.v
+        p.var.a = VEC0
+    end
+    remesh!(grid)
+    find_pressure!(solver, dt)
+    apply_binary!(grid, internal_force!)
+    stabilize!(grid)
+    @batch for p in grid.polygons
+        p.var.v += dt*p.var.a
+    end
+end
+
+function midpoint_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
+    # new positions
+    @batch for p in grid.polygons
+        tmp = p.var.x_old + 2*dt*p.var.v
+        p.var.x_old = p.x
+        if isinside(grid.boundary_rect, tmp)
+            p.x = tmp
+        end
+    end
+    remesh!(grid)
+    # intermediate velocity
+    @batch for p in grid.polygons
+        tmp = p.var.v
+        p.var.v = p.var.v_old + dt*p.var.a_old
+        p.var.v_old = tmp
+        p.var.a_old = p.var.a
+        p.var.a = VEC0
+    end
+    # the implicit step
+    #apply_local!(grid, stabilizer!, h_stab)
+    apply_unary!(grid, no_slip!)
+    find_pressure!(solver, dt)
+    apply_binary!(grid, internal_force!)
+    stabilize!(grid)
+    @batch for p in grid.polygons
+        p.var.v += dt*p.var.a
+        #p.var.v = v_exact(p.x)
+    end
+    apply_unary!(grid, no_slip!)
+end
+
+function cnab_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
+    # new positions
+    @batch for p in grid.polygons
+        p.var.x_old = p.x
+        p.x += 1.5*dt*p.var.v - 0.5*dt*p.var.v_old
+        if !isinside(grid.boundary_rect, p.x)
+            p.x = p.var.x_old
+        end
+    end
+    #lloyd_step!(grid, 0.1)
+    remesh!(grid)
+    # intermediate velocity
+    @batch for p in grid.polygons
+        p.var.v_old = p.var.v
+        p.var.v += 0.5*dt*p.var.a
+        p.var.a = VEC0
+    end
+    # the implicit step
+    #apply_local!(grid, stabilizer!, h_stab)
+    #apply_unary!(grid, no_slip!)
+    find_pressure!(solver, 0.5*dt)
+    apply_binary!(grid, internal_force!)
+    #stabilize!(grid)
+    @batch for p in grid.polygons
+        p.var.v += 0.5*dt*p.var.a
+        #p.var.v += dt*p.var.a
+        #p.var.v = v_exact(p.x)
+    end
+    #apply_unary!(grid, no_slip!)
+    lloyd_stabilization!(grid, 10*dt)
+end
 
 function stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
 	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
 end
 
-
-function stabilization_test()
-    domain = Rectangle(xlims = xlims, ylims = ylims)
-    grid = VoronoiGrid{PhysFields}(h, domain)
-    populate_circ!(grid, dr)
-    remesh!(grid)
-    apply_unary!(grid, get_mass!)
-    p0 = grid.polygons[1]
-    x0 = p0.x
-    for p in grid.polygons
-        p.var.P = 0.5*norm_squared(p.x - x0)
+function lloyd_step!(grid::VoronoiGrid, tau::Float64)
+    @threads for p in grid.polygons
+        c = centroid(p)
+        p.x = tau/(tau + dt)*p.x + dt/(tau + dt)*c 
     end
-    apply_binary!(grid, internal_force!)
-    c0 = centroid(p0)
-    acc = p0.var.rho*dot(p0.var.a, c0 - x0)/norm_squared(c0 - x0)
-    @show acc
-    stabilize!(grid)
-    acc = p0.var.rho*dot(p0.var.a, c0 - x0)/norm_squared(c0 - x0)
-    @show acc
 end
+
+function viscous_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
+    lrr = lr_ratio(p, q, e)
+    p.var.a += 1e-4*lrr*(q.var.v - p.var.v)/p.var.mass
+end
+
+
 
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
@@ -118,29 +194,20 @@ function main()
 
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
-    
+
     solver = PressureSolver(grid)
-    vy_data = Vector{Vector{Float64}}()
-    @time for k = 0 : k_end
-        move!(grid, dt)
-        #lloyd_stabilization!(grid, tau_r)
-        remesh!(grid)
-        apply_local!(grid, stabilizer!, h_stab)
-        #apply_unary!(grid, get_mass!)
-        #stabilize!(grid)
-        #apply_unary!(grid, accelerate!)
-        #apply_unary!(grid, no_slip!)
+    @time for k = 1 : k_end
         try
-            find_pressure!(solver, dt)
+            if k < 3
+                init!(grid, dt, solver)
+            else
+                cnab_step!(grid, dt, solver)
+            end
         catch e
             vtk_save(pvd_p)
             vtk_save(pvd_c)
             throw(e)
         end
-        apply_binary!(grid, internal_force!)
-        stabilize!(grid)
-        accelerate!(grid, dt)
-        #apply_unary!(grid, no_slip!)
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -152,14 +219,6 @@ function main()
             pvd_c[t] = export_grid(grid, string(export_path, "/cframe", nframe, ".vtp"), export_vars...)
             pvd_p[t] = export_points(grid, string(export_path, "/pframe", nframe, ".vtp"), export_vars...)
             nframe += 1
-            # store velocity profile along midline
-            vy = Float64[]
-            x_range = 0.0:(2*dr):xlims[2]
-            for x1 in x_range
-                x = RealVector(x1, 0.0)
-                push!(vy, point_value(grid, x, p -> p.var.v[2]))
-            end
-            push!(vy_data, vy) 
         end
     end
     vtk_save(pvd_p)
@@ -168,14 +227,16 @@ function main()
     csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
 	CSV.write(string(export_path, "/error_data.csv"), csv_data)
 
-    # plot midline
-    dk = div(length(vy_data), 3)
-    csv_data = DataFrame(x = 0.0:(2*dr):xlims[2], 
-        vy_t0 = vy_data[1], 
-        vy_t1 = vy_data[1 + dk], 
-        vy_t2 = vy_data[1 + 2*dk],
-        vy_t3 = vy_data[end]
-    )
+    # export velocity profile along midline
+    x_range = 0.0:(2*dr):xlims[2]
+    vy_sim = Float64[]
+    vy_exact = Float64[]
+    for x1 in x_range
+        x = RealVector(x1, 0.0)
+        push!(vy_sim, point_value(grid, x, p -> p.var.v[2]))
+        push!(vy_exact, v_exact(x)[2])
+    end
+    csv_data = DataFrame(x = x_range, vy_sim = vy_sim, vy_exact = vy_exact)
 	CSV.write(string(export_path, "/midline_data.csv"), csv_data)
     plot_midline()
 
@@ -220,27 +281,24 @@ end
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
     plt = plot(
+        csv_data.x, 
+        csv_data.vy_exact, 
+        label = "exact solution",
         xlabel = L"x",
         ylabel = L"v_y",
         color = :blue,
         linestyle = :dash,
         bottom_margin = 5mm
     )
-    for (vy, label) in (
-            (csv_data.vy_t0, L"t=0"), 
-            (csv_data.vy_t1, L"t=1"), 
-            (csv_data.vy_t2, L"t=2"), 
-            (csv_data.vy_t3, L"t=3")
-        )
-        plot!(
-            plt,
-            csv_data.x,
-            vy,
-            label = label,
-            markershape = :hex,
-            markersize = 2,
-        )
-    end
+    plot!(
+        plt,
+        csv_data.x,
+        csv_data.vy_sim,
+        label = "simulation result",
+        markershape = :hex,
+        markersize = 2,
+        color = :orange
+    )
 
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end

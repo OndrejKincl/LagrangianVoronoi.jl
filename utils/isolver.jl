@@ -151,7 +151,20 @@ function move!(grid::VoronoiGrid, dt::Float64)
         new_x = p.x + dt*p.var.v
         if isinside(grid.boundary_rect, new_x)
             p.x = new_x
-        end 
+        else # try to project v to tangent space
+            for e in p.edges
+                if isboundary(e)
+                    n = normal_vector(e)
+                    p.var.v -= dot(p.var.v, n)*n
+                end
+            end
+            new_x = p.x + dt*p.var.v
+            if isinside(grid.boundary_rect, new_x)
+                p.x = new_x
+            else # give up and halt the particle
+                p.var.v = VEC0
+            end
+        end
     end
 end
 

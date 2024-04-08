@@ -7,15 +7,15 @@ include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const rho_d = 1.0
-const rho_u = 2.0
-const Re = 400.0
+const rho_u = 1.8
+const Re = 420.0
 const Fr = 1.0
 #const atwood = (rho_u - rho_d)/(rho_u + rho_d)
 
 const xlims = (0.0, 1.0)
-const ylims = (0.0, 1.0)
+const ylims = (0.0, 2.0)
 
-const N = 100 #resolution
+const N = 60 #resolution
 const dr = 1.0/N
 const h = 2*dr
 
@@ -23,17 +23,17 @@ const v_char = 3.0
 const l_char = 1.0
 const dt = 0.1*dr/v_char
 const tau_r = 0.1*l_char/v_char
-const t_end =  0.5
-const nframes = 100 #100
+const t_end =  5.0
+const nframes = 100
 
-const export_path = "results/rti_chaos"
+const export_path = "results/rtiA"
 const PROJECTION_STEPS = 1
 
 
-include("../utils/lloyd.jl")
+#include("../utils/lloyd.jl")
 
 function dividing_curve(x::Float64)::Float64
-    return 0.5 - 0.15*sin(2*pi*x[1])
+    return 1.0 - 0.15*sin(2*pi*x[1])
     #return 0.5 + 0.125*(0.7*cos(2*pi*x[1])+ 0.5*sin(2*pi*x[1]) + 0.3*cos(4*pi*x[1]) + 0.5*sin(4*pi*x[1]) + 0.1*cos(6*pi*x[1]) + 0.3*sin(6*pi*x[1]))
 end
 
@@ -47,7 +47,7 @@ end
     lloyd_dv::RealVector = VEC0
 end
 
-include("../utils/isolver2.jl")
+include("../utils/isolver.jl")
 
 function PhysFields(x::RealVector)
     return PhysFields(rho = (x[2] < dividing_curve(x[1]) ? rho_d : rho_u))
@@ -67,26 +67,69 @@ function gravity!(p::VoronoiPolygon)
     p.var.v -= dt/(Fr^2)*VECY
 end
 
-function viscosity!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
-    p.var.a -= 1.0/(Re*p.var.mass)*lr_ratio(p,q,e)*(p.var.v - q.var.v)
+function viscous_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
+    lrr = lr_ratio(p, q, e)
+    p.var.a += (1.0/Re)*lrr*(q.var.v - p.var.v)/p.var.mass
+end
+
+function wall!(p::VoronoiPolygon)
+    gamma = 1.0
+    if isnan(p.var.P)
+        throw("Pressure is NaN.")
+    end
+    for e in p.edges
+        if !isboundary(e)
+            continue
+        end
+        m = 0.5*(e.v1 + e.v2)
+        n = normal_vector(e)
+        l = len(e)
+        r = abs(dot(m - p.x, n))
+        v_D = (m[2] > ylims[2] - 0.1*dr ? VECX : VEC0)
+        lambda = l/(Re*r*p.var.mass)
+        p.var.v += dt*lambda*v_D
+        gamma += dt*lambda
+    end
+    p.var.v = p.var.v/gamma
 end
 
 function step!(grid::VoronoiGrid, solver::PressureSolver)
-    lloyd_stabilization!(grid, tau_r)
-    apply_unary!(grid, move!)
+    #lloyd_stabilization!(grid, tau_r)
+    move!(grid, dt)
     remesh!(grid)
-    apply_binary!(grid, viscosity!)
-    apply_unary!(grid, accelerate!)
+    apply_binary!(grid, viscous_force!)
+    #apply_unary!(grid, wall!)
+    accelerate!(grid, dt)
     apply_unary!(grid, gravity!)
     apply_unary!(grid, no_slip!)
     for _ in 1:PROJECTION_STEPS
         find_pressure!(solver, dt)
     end
     apply_binary!(grid, internal_force!)
-    apply_unary!(grid, accelerate!)
+    stabilize!(grid)
+    accelerate!(grid, dt)
     apply_unary!(grid, no_slip!)
 end
 
+function stabilize!(grid::VoronoiGrid)
+    @threads for p in grid.polygons
+        if isnan(p.var.P)
+            throw("Pressure is NaN.")
+        end
+        LapP = 0.0 #laplacian of pressure
+        for e in p.edges
+            if isboundary(e)
+                continue
+            end
+            q = grid.polygons[e.label]
+            LapP -= lr_ratio(p,q,e)*(p.var.P - q.var.P)
+        end
+        if LapP > 0.0
+            c = centroid(p)
+            p.var.a += 1.5*LapP/(p.var.mass)*(c - p.x)
+        end
+    end
+end
 
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
