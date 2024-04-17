@@ -19,7 +19,7 @@ const N = 60 #resolution
 const dr = 1.0/N
 const h = 2*dr
 
-const v_char = 3.0
+const v_char = 10.0
 const l_char = 1.0
 const dt = 0.1*dr/v_char
 const tau_r = 0.1*l_char/v_char
@@ -27,10 +27,10 @@ const t_end =  5.0
 const nframes = 100
 
 const export_path = "results/rtiA"
-const PROJECTION_STEPS = 1
+const PROJECTION_STEPS = 10
 
 
-#include("../utils/lloyd.jl")
+include("../utils/lloyd.jl")
 
 function dividing_curve(x::Float64)::Float64
     return 1.0 - 0.15*sin(2*pi*x[1])
@@ -94,7 +94,7 @@ function wall!(p::VoronoiPolygon)
 end
 
 function step!(grid::VoronoiGrid, solver::PressureSolver)
-    #lloyd_stabilization!(grid, tau_r)
+    lloyd_stabilization!(grid, tau_r)
     move!(grid, dt)
     remesh!(grid)
     apply_binary!(grid, viscous_force!)

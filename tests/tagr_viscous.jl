@@ -18,9 +18,11 @@ const nframes = 5
 const l_char = 1.0
 const v_char = 1.0
 
+const Re = Inf
 
+const structured = false
 
-export_path = "results/tagr"
+export_path = (isinf(Re) ? "results/tagrReInf" : "results/tagrRe$(round(Int, Re))") * (structured ? "" : "u")
 
 include("../utils/parallel_settings.jl")
 #include("../utils/lloyd.jl")
@@ -32,6 +34,7 @@ include("../utils/parallel_settings.jl")
     a::RealVector = VEC0
     P::Float64 = 0.0
     rho::Float64 = rho0
+    div::Float64 = 0.0
 end
 include("../utils/isolver.jl")
 
@@ -40,14 +43,18 @@ function PhysFields(x::RealVector)
     return PhysFields(v = v_exact(x))
 end
 
-function v_exact(x::RealVector)::RealVector
-    u =  cos(pi*x[1])*sin(pi*x[2])
-    v = -sin(pi*x[1])*cos(pi*x[2])
-    return u*VECX + v*VECY
+function v_max(t::Float64)::Float64
+    return exp(-2.0*pi^2*t/Re)
 end
 
-function P_exact(x::RealVector)::Float64
-    return 0.5*(sin(pi*x[1])^2 + sin(pi*x[2])^2 - 1.0)
+function v_exact(x::RealVector, t::Float64=0.0)::RealVector
+    u0 =  cos(pi*x[1])*sin(pi*x[2])
+    v0 = -sin(pi*x[1])*cos(pi*x[2])
+    return v_max(t)*(u0*VECX + v0*VECY)
+end
+
+function P_exact(x::RealVector, t::Float64=0.0)::Float64
+    return 0.5*v_max(t)*(sin(pi*x[1])^2 + sin(pi*x[2])^2 - 1.0)
 end
 
 function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, h_stab::Float64, dt::Float64, P0::Float64)
@@ -62,53 +69,82 @@ end
 
 export_vars = (:v, :P)
 
-function get_errors(grid::VoronoiGrid)
+function get_errors(grid::VoronoiGrid, t::Float64)
     P_error = 0.0
     v_error = 0.0
-    E_error = -0.5
+    E_error = -0.5*v_max(t)^2
+    div = 0.0
     for p in grid.polygons
         E_error += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
         if boundary_filter(p.x)
             continue
         end
-        v_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x))
-        P_error += area(p)*(p.var.P - P_exact(p.x))^2
+        v_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x, t))
+        P_error += area(p)*(p.var.P - P_exact(p.x, t))^2
+        # find divergence of p
+        p.var.div = 0.0
+        for e in p.edges
+            if isboundary(e)
+                continue
+            end
+            q = grid.polygons[e.label]
+            lrr = lr_ratio(p, q, e)
+            m = 0.5*(e.v1 + e.v2)
+            z = 0.5*(p.x + q.x)
+            p.var.div += lrr*(dot(p.var.v - q.var.v, m - z) - 0.5*dot(p.var.v + q.var.v, p.x - q.x))
+        end
+        div += area(p)*(p.var.div)^2
     end
-    return (E_error, sqrt(v_error), sqrt(P_error))
+    return (E_error, sqrt(v_error), sqrt(P_error), sqrt(div))
+end
+
+function viscous_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
+    lrr = lr_ratio(p, q, e)
+    p.var.a += (1.0/Re)*lrr*(q.var.v - p.var.v)/p.var.mass
 end
 
 function solve(N::Int, stabilize::Bool)
     dr = 1.0/N
-    dt = 0.1*dr
+    dt = 0.03*min(dr, dr^2*Re)
     h = 2.0*dr
     P0 = dr
     @show N
 
     domain = Rectangle(xlims = xlims, ylims = ylims)
     grid = VoronoiGrid{PhysFields}(h, domain)
-    #populate_vogel!(grid, dr)
-    populate_rect!(grid, dr)
-    #Random.seed!(123)
-    #populate_lloyd!(grid, dr, niterations = 20)
-    #populate_circ!(grid, dr)
+    if structured
+        populate_rect!(grid, dr)
+    else
+        populate_vogel!(grid, dr)
+        #Random.seed!(123)
+        #populate_lloyd!(grid, dr, niterations = 100)
+        #populate_circ!(grid, dr)
+    end
     apply_unary!(grid, get_mass!)
 
     nframe = 0
     E_errors = Float64[]
     v_errors = Float64[]
     P_errors = Float64[]
+    divs = Float64[]
     time = Float64[]
 
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
 
     solver = PressureSolver(grid)
+    
     @time for k = 0 : k_end
+        for p in grid.polygons
+            if boundary_filter(p.x)
+                p.var.v = v_exact(p.x, k*dt)
+            end
+         end
         move!(grid, dt)
         #lloyd_step!(grid, tau)
         remesh!(grid)
         #apply_local!(grid, stabilizer!, h_stab)
-        #apply_binary!(grid, viscous_force!)
+        apply_binary!(grid, viscous_force!)
         #apply_unary!(grid, wall!)
         accelerate!(grid, dt)
         find_pressure!(solver, dt)
@@ -119,13 +155,15 @@ function solve(N::Int, stabilize::Bool)
                 t = k*dt
                 @show t
                 push!(time, t)
-                E_error, v_error, P_error = get_errors(grid)
+                E_error, v_error, P_error, div = get_errors(grid, t)
                 push!(v_errors, v_error)
                 push!(P_errors, P_error)
                 push!(E_errors, E_error)
+                push!(divs, div)
                 @show v_error
                 @show P_error
                 @show E_error
+                @show div
                 nframe += 1
             end
         end
@@ -148,42 +186,50 @@ function solve(N::Int, stabilize::Bool)
     plot_midline()
     =#
 
-    return (grid, E_errors[end], v_errors[end], P_errors[end])
+    return (grid, E_errors[end], v_errors[end], P_errors[end], divs[end])
 end
 
 
-    function linear_reg!(plt, x, y, label, color)
-        N = length(x)
-        logx = log10.(x)
-        logy = log10.(y)
-        A = [logx ones(N)]
-        b = A\logy
-        #logY = [b[1]*logx[i] + b[2] for i in 1:N]
-        @show label
-        @show b[1]
+function linear_reg!(plt, x, y, label, color, light=false, shape= :hex)
+    N = length(x)
+    logx = log10.(x)
+    logy = log10.(y)
+    A = [logx ones(N)]
+    b = A\logy
+    logY = [b[1]*logx[i] + b[2] for i in 1:N]
+    @show label
+    @show b[1]
+    if !light
         plot!(plt,
             logx, logy,
-            markershape = :hex, 
-            label = label, #*" (slope = $(round(b[1], sigdigits=3)))",
-            color = color
+            markershape = shape, 
+            label = label*" ($(round(b[1], sigdigits=3)))",
+            color = color,
         )
-        #=
         plot!(plt, 
             logx, logY, linestyle = :dot, 
             label = :none,
             color = color
         )
-        =#
-        return
+    else
+        plot!(plt,
+            logx, logy, linestyle = :dot, 
+            markershape = shape, 
+            label = label,#*" ($(round(b[1], sigdigits=3)))",
+            color = color,
+        )
     end
+    return
+end
 
-    function add_slope_triangle!(plt, x, y; order = 1, text_margin = 0.1, sidelen = 1.0)
-        a = sidelen
-        shape = [(x,y), (x+a,y), (x+a, y-a*order), (x,y)]
-        plot!(plt, shape, linecolor = :black, linestyle = :dash, label = :none)
-        annotate!(plt, x+0.5*a, y+text_margin,  text("1", :black, :right, 8))
-        annotate!(plt, x+a+text_margin, y-0.5*a*order, text(string(order), :black, :right, 8))
-    end
+
+function add_slope_triangle!(plt, x, y; order = 1, text_margin = 0.1, sidelen = 1.0)
+    a = sidelen
+    shape = [(x-a,y), (x,y), (x, y-a*order), (x-a,y)]
+    plot!(plt, shape, linecolor = :black, linestyle = :dash, label = :none)
+    #annotate!(plt, x-0.5*a, y+text_margin,  text("1", :black, :right, 8))
+    #annotate!(plt, x+text_margin, y-0.5*a*order, text(string(order), :black, :right, 8))
+end
 
 function main()
     if !ispath(export_path)
@@ -191,28 +237,32 @@ function main()
         @info "created a new path \""*export_path*"\""
     end 
     pvd = paraview_collection(export_path*"/cells.pvd")
-    Ns = [16, 32, 48, 72, 108, 162, 243]
+    Ns = [16, 32, 48, 72, 108]#, 162, 243]
     Ncells = []
     E_errs = []
     v_errs = []
     P_errs = []
+    divs = []
     for N in Ns
-        grid, E_err, v_err, P_err = solve(N, true)
+        grid, E_err, v_err, P_err, div = solve(N, true)
         push!(E_errs, abs(E_err))
         push!(v_errs, v_err)
         push!(P_errs, P_err)
+        push!(divs, div)
         push!(Ncells, length(grid.polygons))
         pvd[N] = export_grid(grid, string(export_path, "/frame", N, ".vtp"), :v, :P)
     end
+    csv = DataFrame(Ns = Ns, E_errs = E_errs, v_errs = v_errs, P_errs = P_errs, divs = divs)
+	CSV.write(string(export_path, "/convergence.csv"), csv)
     vtk_save(pvd)
     plt = plot(
         axis_ratio = 1, 
-        xlabel = L"\log_{10} \, N", ylabel = L"\log_{10} \, \epsilon"
+        xlabel = "log resolution", ylabel = "log error"
     )
-    linear_reg!(plt, Ns, E_errs, "energy", :orange)
-    linear_reg!(plt, Ns, P_errs, "pressure", :royalblue)
-    linear_reg!(plt, Ns, v_errs, "velocity", :purple)
-    add_slope_triangle!(plt, 2, -1.5, order=1) 
+    linear_reg!(plt, Ns, E_errs, "energy error", :orange)
+    linear_reg!(plt, Ns, P_errs, "pressure error", :royalblue)
+    linear_reg!(plt, Ns, v_errs, "velocity error", :purple)
+    linear_reg!(plt, Ns, divs, "volume error", :darkgreen)
     savefig(plt, export_path*"/convergence.pdf")
     
 end
@@ -321,6 +371,53 @@ function plot_midline()
 
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
+
+function joint_figure(Re_values = (400, 1000, Inf))
+    myfont = font(12)
+    for var in (:v_errs, :P_errs, :E_errs, :divs)
+        plt = plot(
+            axis_ratio = 1, 
+            xlabel = "log resolution", ylabel = "log error",
+            legend = :bottomleft, #:outerright,
+            xtickfont=myfont, 
+            ytickfont=myfont, 
+            guidefont=myfont, 
+            legendfont=myfont,
+        )
+        i = 1
+        ymin = +Inf
+        ymax = -Inf
+        xmax = -Inf
+        rainbow = cgrad(:darkrainbow, 2*length(Re_values), categorical = true)
+        shapes = [:circ, :hex, :square, :star4, :star5, :utriangle, :dtriangle, :pentagon, :rtriangle, :ltriangle]
+        for _structured in (true, false), Re in Re_values
+            path = "results/tagrRe$(Re)"*(_structured ? "" : "u")*"/convergence.csv"
+            csv = CSV.read(path, DataFrame)
+            y = getproperty(csv, var)
+            x = csv.Ns
+            Re_label = @match Re begin
+                400 => " 400"
+                1000 => " 1000"
+                Inf => " Inf"
+            end
+            linear_reg!(plt, x, y, (_structured ? "ST" : "UN") *Re_label, rainbow[i], true, shapes[i])
+
+            xmax = max(xmax, log10(maximum(x)))
+            ymax = max(ymax, log10(maximum(y)))
+            ymin = min(ymin, log10(minimum(y)))
+            i += 1
+        end
+        if var == :v_errs || var == :P_errs
+            add_slope_triangle!(plt, xmax+0.5, ymax-0.1, order=1, sidelen=0.2*(ymax-ymin)) 
+            add_slope_triangle!(plt, xmax+0.5, ymax-0.1, order=2, sidelen=0.2*(ymax-ymin))
+        else
+            add_slope_triangle!(plt, xmax+1.5, ymax-0.1, order=1, sidelen=0.2*(ymax-ymin)) 
+            add_slope_triangle!(plt, xmax+1.5, ymax-0.1, order=2, sidelen=0.2*(ymax-ymin))        
+        end
+        savefig(plt, "results/tagr_$(var).pdf")
+    end
+end
+    
 
 if abspath(PROGRAM_FILE) == @__FILE__
     main()

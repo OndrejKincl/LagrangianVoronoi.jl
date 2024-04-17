@@ -25,7 +25,7 @@ struct LaplaceOperator # actually minus Laplace
 end
 
 function mul!(y::ThreadedVec{Float64}, A::LaplaceOperator, x::ThreadedVec{Float64})::ThreadedVec{Float64}
-    init = dot(A.ones, x)
+    init = 0.0# dot(A.ones, x)
     @batch for i in 1:A.n
         @inbounds begin
             y[i] = init

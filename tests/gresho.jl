@@ -16,7 +16,7 @@ const ylims = (-0.5, 0.5)
 const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.2*dr/v_char
+const dt = 0.05*dr/v_char
 const tau_r = 100*dt #0.2*l_char/v_char
 const t_end =  3.0
 const nframes = 50

@@ -13,16 +13,16 @@ const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 100 #resolution
+const N = 200 #resolution
 const dr = 1.0/N
 
-const dt = 0.1*dr/v_char
+const dt = 0.2*dr/v_char
 const tau_r = 0.2*l_char/v_char
 const t_end =  3.0
 const nframes = 100
 
 const h = 2.0*dr
-const export_path = "results/gresho"
+const export_path = "results/gresho$(N)"
 
 const h_stab = h
 const P_stab = 0.01*rho0*v_char^2
@@ -129,7 +129,7 @@ function main()
         #apply_unary!(grid, get_mass!)
         #stabilize!(grid)
         #apply_unary!(grid, accelerate!)
-        #apply_unary!(grid, no_slip!)
+        apply_unary!(grid, no_slip!)
         try
             find_pressure!(solver, dt)
         catch e
@@ -140,7 +140,7 @@ function main()
         apply_binary!(grid, internal_force!)
         stabilize!(grid)
         accelerate!(grid, dt)
-        #apply_unary!(grid, no_slip!)
+        apply_unary!(grid, no_slip!)
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -226,6 +226,15 @@ function plot_midline()
         linestyle = :dash,
         bottom_margin = 5mm
     )
+    plot!(
+        plt,
+        csv_data.x,
+        csv_data.vy_t3,
+        label = "simulation",
+        markershape = :hex,
+        markersize = 2,
+    )
+    #=
     for (vy, label) in (
             (csv_data.vy_t0, L"t=0"), 
             (csv_data.vy_t1, L"t=1"), 
@@ -241,8 +250,72 @@ function plot_midline()
             markersize = 2,
         )
     end
+    =#
 
     savefig(plt, string(export_path, "/midline_plot.pdf"))
+end
+
+function convergence_plot()
+    font_size = 12
+    plt = plot(
+        xlabel = "x-coordinate",
+        ylabel = "y-velocity",
+        bottom_margin = 5mm,
+        xtickfont=font(font_size), 
+        ytickfont=font(font_size), 
+        guidefont=font(font_size), 
+        legendfont=font(font_size)
+    )
+    plt_energy = plot(
+        range(0.0, 3.0, length = 3),
+        ones(3),
+        label = "analytic",
+        xlabel = "time",
+        ylabel = "energy",
+        ylims = (0.6, 1.0),
+        xtickfont=font(font_size), 
+        ytickfont=font(font_size), 
+        guidefont=font(font_size), 
+        legendfont=font(font_size)
+    )
+    i = 1
+    colors = cgrad(:darkrainbow, 3, categorical = true)
+    shapes = [:circ, :hex, :square, :star4, :star5, :utriangle, :dtriangle, :pentagon, :rtriangle, :ltriangle]
+    for res in (200, 100, 50)
+        path = "results/gresho$(res)/midline_data.csv"
+        energy_path = "results/gresho$(res)/error_data.csv"
+        data = CSV.read(path, DataFrame)
+        if i == 1
+            plot!(
+                plt,
+                data.x,
+                data.vy_t0,
+                label = "analytic",
+            )
+        end
+        plot!(
+            plt,
+            data.x,
+            data.vy_t3,
+            label = "N = $(res)",
+            markershape = shapes[i],
+            markersize = 2,
+            color = colors[i]
+        )
+        energy_data = CSV.read(energy_path, DataFrame)
+        plot!(
+            plt_energy,
+            energy_data.time[1:4:end],
+            energy_data.energy[1:4:end]./energy_data.energy[1],
+            label = "N = $(res)",
+            markershape = shapes[i],
+            markersize = 2,
+            color = colors[i]
+        )
+        i += 1
+    end
+    savefig(plt, "gresho_convergence.pdf")
+    savefig(plt_energy, "gresho_energy.pdf")
 end
 
 

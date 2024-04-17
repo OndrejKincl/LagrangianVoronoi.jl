@@ -190,7 +190,7 @@ end
 
 function make_colorbar(x_start, x_end, label, cmap)
     data = [(i-1)/9*x_start + (10-i)/9*x_end for i in 1:10, j in 1:10]
-    plt = heatmap(1:10, 1:10, data, colorbar = :top, cmap = cmap, colorbar_title = label, colorbar_titlefontsize=40, right_margin = 50mm)
+    plt = heatmap(1:10, 1:10, data, colorbar = :top, cmap = cmap, colorbar_title = label, colorbar_titlefontsize=40, colorbar_tickfontsize=12, right_margin = 50mm)
     savefig(plt, "colormap.pdf")
 end
 

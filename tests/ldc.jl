@@ -10,7 +10,7 @@ using .LagrangianVoronoi
 
 
 
-const Re = 400
+const Re = 3200
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
@@ -31,7 +31,7 @@ const h = 2.0*dr
 #const h_stab = 2.0*dr
 #const dirichlet_eps = 0.1*dr
 
-const export_path = "results/ldc3200"
+const export_path = "results/ldc$(Re)"
 
 include("../utils/parallel_settings.jl")
 #include("../utils/lloyd.jl")
@@ -217,26 +217,34 @@ function make_plot(Re=Re)
 	ref_vx = getproperty(ref_y2vx, propertyname)
 	ref_x = ref_x2vy.x
 	ref_y = ref_y2vx.y
-	data = CSV.read(export_path*"/data.csv", DataFrame)
+	data = CSV.read("results/ldc$(Re)/data.csv", DataFrame)
+    myfont = font(12)
 	p1 = plot(
 		data.s, data.v2,
-		xlabel = L"x, y",
-		ylabel = L"u, v",
-		label = "ILVA "*L"u",
+		xlabel = "x, y",
+		ylabel = "u, v",
+		label = "u",
 		linewidth = 2,
 		legend = :topleft,
 		color = :orange,
+        xtickfont=myfont, 
+        ytickfont=myfont, 
+        guidefont=myfont, 
+        legendfont=myfont,
 	)
-	scatter!(p1, ref_x, ref_vy, label = "Ghia "*L"u", color = :orange, markersize = 4, markerstroke = stroke(1, :black), markershape = :circ)
-	#savefig(p1, export_path*"/ldc-x2vy.pdf")    
+	scatter!(p1, ref_x, ref_vy, label = false, color = :orange, markersize = 4, markerstroke = stroke(1, :black), markershape = :circ)
 	plot!(p1,
 		data.s, data.v1,
-        label = "ILVA "*L"v",
+        label = "v",
 		linewidth = 2,
 		color = :royalblue,
+        xtickfont=myfont, 
+        ytickfont=myfont, 
+        guidefont=myfont, 
+        legendfont=myfont,
 	)
-	scatter!(p1, ref_y, ref_vx, label = "Ghia "*L"v", color = :royalblue, markersize = 4, markerstroke = stroke(1, :black), markershape = :square)
-	savefig(p1, export_path*"/ldc.pdf")
+	scatter!(p1, ref_y, ref_vx, label = false, color = :royalblue, markersize = 4, markerstroke = stroke(1, :black), markershape = :square)
+	savefig(p1, "results/ldc$(Re).pdf")
 end
 
 

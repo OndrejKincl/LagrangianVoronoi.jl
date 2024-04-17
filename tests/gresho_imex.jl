@@ -16,7 +16,7 @@ const ylims = (-0.5, 0.5)
 const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.1*dr/v_char
+const dt = 0.05*dr/v_char
 const tau_r = l_char/v_char
 const t_end =  1.0
 const nframes = 100
@@ -44,7 +44,7 @@ include("../utils/lloyd.jl")
     lloyd_dx::RealVector = VEC0
     lloyd_dv::RealVector = VEC0
 end
-include("../utils/isolver.jl")
+include("../utils/cnab.jl")
 
 
 function PhysFields(x::RealVector)
@@ -78,102 +78,6 @@ function find_energy(grid::VoronoiGrid)::Float64
     return E
 end
 
-function init!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
-    @batch for p in grid.polygons
-        p.var.x_old = p.x
-        p.var.v_old = p.var.v
-        p.var.a_old = p.var.a
-        p.x += dt*p.var.v
-        p.var.a = VEC0
-    end
-    remesh!(grid)
-    find_pressure!(solver, dt)
-    apply_binary!(grid, internal_force!)
-    stabilize!(grid)
-    @batch for p in grid.polygons
-        p.var.v += dt*p.var.a
-    end
-end
-
-function midpoint_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
-    # new positions
-    @batch for p in grid.polygons
-        tmp = p.var.x_old + 2*dt*p.var.v
-        p.var.x_old = p.x
-        if isinside(grid.boundary_rect, tmp)
-            p.x = tmp
-        end
-    end
-    remesh!(grid)
-    # intermediate velocity
-    @batch for p in grid.polygons
-        tmp = p.var.v
-        p.var.v = p.var.v_old + dt*p.var.a_old
-        p.var.v_old = tmp
-        p.var.a_old = p.var.a
-        p.var.a = VEC0
-    end
-    # the implicit step
-    #apply_local!(grid, stabilizer!, h_stab)
-    apply_unary!(grid, no_slip!)
-    find_pressure!(solver, dt)
-    apply_binary!(grid, internal_force!)
-    stabilize!(grid)
-    @batch for p in grid.polygons
-        p.var.v += dt*p.var.a
-        #p.var.v = v_exact(p.x)
-    end
-    apply_unary!(grid, no_slip!)
-end
-
-function cnab_step!(grid::VoronoiGrid, dt::Float64, solver::PressureSolver)
-    # new positions
-    @batch for p in grid.polygons
-        p.var.x_old = p.x
-        p.x += 1.5*dt*p.var.v - 0.5*dt*p.var.v_old
-        if !isinside(grid.boundary_rect, p.x)
-            p.x = p.var.x_old
-        end
-    end
-    #lloyd_step!(grid, 0.1)
-    remesh!(grid)
-    # intermediate velocity
-    @batch for p in grid.polygons
-        p.var.v_old = p.var.v
-        p.var.v += 0.5*dt*p.var.a
-        p.var.a = VEC0
-    end
-    # the implicit step
-    #apply_local!(grid, stabilizer!, h_stab)
-    #apply_unary!(grid, no_slip!)
-    find_pressure!(solver, 0.5*dt)
-    apply_binary!(grid, internal_force!)
-    #stabilize!(grid)
-    @batch for p in grid.polygons
-        p.var.v += 0.5*dt*p.var.a
-        #p.var.v += dt*p.var.a
-        #p.var.v = v_exact(p.x)
-    end
-    #apply_unary!(grid, no_slip!)
-    lloyd_stabilization!(grid, 10*dt)
-end
-
-function stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
-end
-
-function lloyd_step!(grid::VoronoiGrid, tau::Float64)
-    @threads for p in grid.polygons
-        c = centroid(p)
-        p.x = tau/(tau + dt)*p.x + dt/(tau + dt)*c 
-    end
-end
-
-function viscous_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
-    lrr = lr_ratio(p, q, e)
-    p.var.a += 1e-4*lrr*(q.var.v - p.var.v)/p.var.mass
-end
-
 
 
 function main()
@@ -195,14 +99,10 @@ function main()
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
 
-    solver = PressureSolver(grid)
+    cnab = CNAB_scheme(grid, dt)
     @time for k = 1 : k_end
         try
-            if k < 3
-                init!(grid, dt, solver)
-            else
-                cnab_step!(grid, dt, solver)
-            end
+            step!(cnab)
         catch e
             vtk_save(pvd_p)
             vtk_save(pvd_c)
