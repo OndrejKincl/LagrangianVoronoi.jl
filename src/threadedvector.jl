@@ -1,42 +1,9 @@
 import Base: eltype, size
-import LinearAlgebra: mul!
-using SparseArrays
 using Base.Threads
 using Polyester
 import Base: *
 import Base: similar, copyto!, fill!, pointer
 import LinearAlgebra: axpy!, rmul!, dot, norm
-
-struct ThreadedMul{Tv,Ti}
-    A::SparseMatrixCSC{Tv,Ti}
-end
-
-function mul!(y::AbstractVector, M::ThreadedMul, x::AbstractVector)
-    @batch for i = 1 : M.A.n
-        _threaded_mul!(y, M.A, x, i)
-    end
-    y
-end
-
-*(A::ThreadedMul, y::AbstractVector) = mul!(similar(y), A, y)
-
-@inline function _threaded_mul!(y, A::SparseMatrixCSC{Tv}, x, i) where {Tv}
-    s = zero(Tv)
-    for j = A.colptr[i] : A.colptr[i + 1] - 1
-        @inbounds s += A.nzval[j] * x[A.rowval[j]]
-    end
-    @inbounds y[i] = s
-    y
-end
-
-eltype(M::ThreadedMul) = eltype(M.A)
-size(M::ThreadedMul, I...) = size(M.A, I...)
-
-#Base.similar(x) : return vec y similar to x
-#LinearAlgebra.axpy!(a, x, y) : assign y = y + a*x and return y
-#LinearAlgebra.rmul!(x, b) :  scale x by scalar b in place
-#LinearAlgebra.dot(a, b) :  return the dot product of a and b
-#Base.copyto!(dst, src) : overwrite dst[i] by src[i]
 
 struct ThreadedVec{T} <: DenseVector{T}
     val::Vector{T}

@@ -13,19 +13,29 @@ const SIGNUM_EPS = 2*eps(Float64)
 end
 
 mutable struct VoronoiPolygon{T}
-    x::RealVector
+    x::RealVector # position
+    v::RealVector # velocity
+    a::RealVector # acceleration
+    P::Float64    # pressure
+    rho::Float64  # density
+    mass::Float64 # mass (duh)
+    var::T        # user-defined variables
     edges::PreAllocVector{Edge}  # sides of the polygon (in no particular order)
-    isbroken::Bool
-    id::Int
-    var::T
     VoronoiPolygon{T}(x::RealVector) where T = new{T}(
         x,
+        VEC0,
+        VEC0,
+        0.0,
+        0.0,
+        0.0,
+        T(),
         PreAllocVector{Edge}(POLYGON_SIZEHINT),
-        false,
-        0,
-        T(x)
     )
 end
+
+# when you have no user-defined variables
+const VanillaPolygon = VoronoiPolygon{Nothing}
+
 
 @inbounds function reset!(p::VoronoiPolygon, boundary_rect::Rectangle)
     empty!(p.edges)
@@ -99,9 +109,6 @@ function influence_rr(p::VoronoiPolygon)::Float64
 end
 
 function area(p::VoronoiPolygon)::Float64
-    if p.isbroken
-        throw("area undefined for broken polygon.")
-    end
     A = 0.0
     for e in p.edges
         # we need to use abs because the edges may not 
@@ -116,9 +123,6 @@ function isboundary(e::Edge)
 end
 
 function isboundary(p::VoronoiPolygon)
-    if p.isbroken
-        throw("isboundary undefined for broken polygon.")
-    end
     for e in p.edges
         if isboundary(e)
             return true
@@ -133,9 +137,6 @@ end
 end
 
 @inbounds function surface_element(p::VoronoiPolygon)
-    if p.isbroken
-        throw("surface element undefined for broken polygon.")
-    end
     dS = VEC0
     for e in p.edges
         if isboundary(e)
@@ -147,9 +148,6 @@ end
 
 
 @inbounds function is_inside(p::VoronoiPolygon, x::RealVector)::Bool
-    if p.isbroken
-        throw("isinside undefined for broken polygon.")
-    end
     # Sunday algorithm
     wn = 0
     for e in p.edges
@@ -180,4 +178,10 @@ function centroid(p::VoronoiPolygon)::RealVector
         c += dA*(p.x + e.v1 + e.v2)/3
     end
     return c/A
+end
+
+function lr_ratio(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)::Float64
+    l2 = norm_squared(e.v1 - e.v2)
+    r2 = norm_squared(p.x - q.x)
+    return sqrt(l2/r2)
 end

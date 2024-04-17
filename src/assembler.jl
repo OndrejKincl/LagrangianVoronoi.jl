@@ -1,8 +1,10 @@
+# The assembler is obsolete
+# We switched to a matrix-free solver
+
 using SparseArrays
 using Base.Threads
 
 # assemble (sparse) matrix from functions on VoronoiPolygons
-# todo : make paralel
 function assemble_system(
     grid::VoronoiGrid, 
     diagonal_element::Function, edge_element::Function, vector_element::Function;

@@ -1,8 +1,10 @@
+# Gresho Vortex Benchmark
+
 module gresho
 
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using SmoothedParticles:rDwendland2
-using LaTeXStrings, DataFrames, CSV, Plots
+using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
 
 include("../src/LagrangianVoronoi.jl")
@@ -16,38 +18,17 @@ const ylims = (-0.5, 0.5)
 const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.05*dr/v_char
-const tau_r = 100*dt #0.2*l_char/v_char
-const t_end =  3.0
-const nframes = 50
+const dt = 0.2*dr/v_char
+const t_end =  1.0
+const nframes = 100
 
-const P_stab = 1e-5*rho0*v_char^2
-const h_stab = 3.0*dr
+const h_stab = 2.0*dr
+const P_stab = 0.01*rho0*v_char^2
 
-const h = 2.0*dr
+const export_path = "results/gresho$(N)"
+const export_vars = (:v, :P, :mass)
 
-const export_path = "results/gresho"
-
-#include("../utils/parallel_settings.jl")
-include("../utils/lloyd.jl")
-include("../utils/isolver.jl")
-
-@with_kw mutable struct PhysFields
-    mass::Float64 = 0.0
-    v::RealVector = VEC0
-    a::RealVector = VEC0
-    P::Float64 = 0.0
-    rho::Float64 = rho0
-    lloyd_dx::RealVector = VEC0
-    lloyd_dv::RealVector = VEC0
-end
-
-
-
-function PhysFields(x::RealVector)
-    return PhysFields(v = v_exact(x))
-end
-
+# exact solution
 function v_exact(x::RealVector)::RealVector
     omega = @match norm(x) begin
         r, if r < 0.2 end => 5.0
@@ -57,12 +38,19 @@ function v_exact(x::RealVector)::RealVector
     return omega*RealVector(-x[2], x[1])
 end
 
-export_vars = (:v, :P)
+# inital condition
+function ic!(p::VoronoiPolygon)
+    p.v = v_exact(p.x)
+    p.rho = rho0
+    p.mass = p.rho*area(p)
+end
+
+
 
 function find_l2_error(grid::VoronoiGrid)::Float64
     L2_error = 0.0
     for p in grid.polygons
-        L2_error += area(p)*LagrangianVoronoi.norm_squared(p.var.v - v_exact(p.x))
+        L2_error += area(p)*norm_squared(p.v - v_exact(p.x))
     end
     return sqrt(L2_error)
 end
@@ -70,21 +58,22 @@ end
 function find_energy(grid::VoronoiGrid)::Float64
     E = 0.0
     for p in grid.polygons
-        E += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
+        E += p.mass*norm_squared(p.v)
     end
     return E
 end
 
-function SPH_stab!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-    p.var.v += -dt*p.var.mass*(P_stab/p.var.rho^2 + P_stab/q.var.rho^2)*(p.x - q.x)*rDwendland2(h_stab, r)
+function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
+    if (xlims[1]+h_stab < p.x[1] < xlims[2]-h_stab) && (ylims[1]+h_stab < p.x[2] < ylims[2]-h_stab)
+	    p.v += -dt*q.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
+    end
 end
 
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
-    grid = VoronoiGrid{PhysFields}(h, domain)
-    populate_circ!(grid, dr)
-    #populate_rect!(grid, dr)
-    apply_unary!(grid, get_mass!)
+    grid = VanillaGrid(domain, dr)
+    populate_circ!(grid)
+    apply_unary!(grid, ic!)
     if !ispath(export_path)
         mkpath(export_path)
         @info "created a new path \""*export_path*"\""
@@ -95,29 +84,15 @@ function main()
     energy = Float64[]
     l2_error = Float64[]
     time = Float64[]
-
     k_end = round(Int, t_end/dt)
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
-
     solver = PressureSolver(grid)
+
     @time for k = 0 : k_end
-        apply_unary!(grid, move!)
-        lloyd_stabilization!(grid, tau_r)
-        remesh!(grid)
-        apply_unary!(grid, no_slip!)
-        #apply_unary!(grid, p -> lloyd_acceleration!(p, tau_r, dt))
-        
-        try
-            find_pressure!(solver, dt)
-        catch e
-            vtk_save(pvd_p)
-            vtk_save(pvd_c)
-            throw(e)
-        end
-        apply_binary!(grid, internal_force!)
-        #apply_local!(grid, SPH_stab!, h_stab)
-        apply_unary!(grid, accelerate!)
-        apply_unary!(grid, no_slip!)
+        move!(grid, dt)
+        apply_local!(grid, SPH_stabilizer!, h_stab)
+        find_pressure!(solver, dt)
+        pressure_force!(grid, dt)
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -128,52 +103,48 @@ function main()
             println("l2 error = ", l2_error[end])
             pvd_c[t] = export_grid(grid, string(export_path, "/cframe", nframe, ".vtp"), export_vars...)
             pvd_p[t] = export_points(grid, string(export_path, "/pframe", nframe, ".vtp"), export_vars...)
-            nframe += 1
+            nframe += 1 
         end
     end
     vtk_save(pvd_p)
     vtk_save(pvd_c)
-
     csv_data = DataFrame(time = time, energy = energy, l2_error = l2_error)
 	CSV.write(string(export_path, "/error_data.csv"), csv_data)
 
-    # export velocity profile along midline
-    x_range = 0.0:(2*dr):xlims[2]
-    vy_sim = Float64[]
+    # store velocity profile along midline
+    vy = Float64[]
     vy_exact = Float64[]
+    x_range = 0.0:(2*dr):xlims[2]
     for x1 in x_range
         x = RealVector(x1, 0.0)
-        push!(vy_sim, point_value(grid, x, p -> p.var.v[2]))
+        push!(vy, point_value(grid, x, p -> p.v[2]))
         push!(vy_exact, v_exact(x)[2])
     end
-    csv_data = DataFrame(x = x_range, vy_sim = vy_sim, vy_exact = vy_exact)
+    csv_data = DataFrame(x = x_range, vy = vy, vy_exact = vy_exact)
 	CSV.write(string(export_path, "/midline_data.csv"), csv_data)
     plot_midline()
-
 end
 
 
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
     plt = plot(
-        csv_data.x, 
-        csv_data.vy_exact, 
-        label = "exact solution",
+        csv_data.x,
+        csv_data.vy_exact,
         xlabel = L"x",
         ylabel = L"v_y",
         color = :blue,
-        linestyle = :dash
+        linestyle = :dash,
+        bottom_margin = 5mm
     )
     plot!(
         plt,
         csv_data.x,
-        csv_data.vy_sim,
-        label = "simulation result",
+        csv_data.vy,
+        label = "simulation",
         markershape = :hex,
         markersize = 2,
-        color = :orange
     )
-
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
 

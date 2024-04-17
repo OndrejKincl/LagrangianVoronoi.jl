@@ -12,12 +12,12 @@ include("geometry.jl")
 export RealVector, RealMatrix, VEC0, VECX, VECY, VECNULL, Edge, Rectangle, len, isinside, norm_squared, verts
 
 include("polygon.jl")
-export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid
+export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio
 
 include("cell_list.jl")
 
 include("voronoigrid.jl")
-export VoronoiGrid, remesh!, limit_cell_diameter!, nearest_polygon, point_value
+export VoronoiGrid, VanillaGrid, remesh!, limit_cell_diameter!, nearest_polygon, point_value
 
 include("IO.jl")
 export export_grid, export_points
@@ -33,6 +33,15 @@ export LinearExpansion, QuadraticExpansion, CubicExpansion
 export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral
 
 include("populate.jl")
-export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!
+export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, get_mass!
+
+include("threadedvector.jl")
+export ThreadedVec
+
+include("physics.jl")
+export move!, pressure_force!, viscous_force!
+
+include("pressuresolver.jl")
+export PressureSolver, find_pressure!
 
 end

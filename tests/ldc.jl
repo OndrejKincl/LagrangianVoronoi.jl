@@ -1,3 +1,5 @@
+# Lid-driven cavity
+
 module ldc
 
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters
@@ -10,7 +12,7 @@ using .LagrangianVoronoi
 
 
 
-const Re = 3200
+const Re = 100
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
@@ -19,95 +21,37 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = min(0.1*dr, 0.1*Re*dr^2)
-const tau = 0.1
-const t_end = 40.0
+const t_end = 1.0
 const nframes = 100
-
-const h = 2.0*dr
-
-#const l_char = 1.0
-#const v_char = 1.0
-#const P_stab = 0.0*rho0*v_char^2
-#const h_stab = 2.0*dr
-#const dirichlet_eps = 0.1*dr
 
 const export_path = "results/ldc$(Re)"
 
-include("../utils/parallel_settings.jl")
-#include("../utils/lloyd.jl")
+export_vars = (:v, :P)
 
-
-@with_kw mutable struct PhysFields
-    mass::Float64 = 0.0
-    v::RealVector = VEC0
-    a::RealVector = VEC0
-    P::Float64 = 0.0
-    rho::Float64 = rho0
-    iswall::Bool = false
-    islid::Bool = false
+# inital condition
+function ic!(p::VoronoiPolygon)
+    p.rho = rho0
+    p.mass = p.rho*area(p)
 end
-include("../utils/isolver.jl")
-
-
-function PhysFields(x::RealVector)
-    return PhysFields()
-end
-
-export_vars = (:v, :P, :iswall, :islid)
 
 function find_energy(grid::VoronoiGrid)::Float64
     E = 0.0
     for p in grid.polygons
-        E += p.var.mass*LagrangianVoronoi.norm_squared(p.var.v)
+        E += p.mass*norm_squared(p.v)
     end
     return E
 end
 
-function stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-	p.var.v += -dt*q.var.mass*rDwendland2(h_stab,r)*(2*P_stab/rho0^2)*(p.x - q.x)
+function vDirichlet(x::RealVector)::RealVector
+    return (x[2] > ylims[2] - 0.1*dr ? VECX : VEC0)
 end
 
-function viscous_force!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
-    lrr = lr_ratio(p, q, e)
-    p.var.a += (1.0/Re)*lrr*(q.var.v - p.var.v)/p.var.mass
-end
-
-function wall!(p::VoronoiPolygon)
-    gamma = 1.0
-    if isnan(p.var.P)
-        throw("Pressure is NaN.")
-    end
-    for e in p.edges
-        if !isboundary(e)
-            continue
-        end
-        m = 0.5*(e.v1 + e.v2)
-        n = normal_vector(e)
-        l = len(e)
-        r = abs(dot(m - p.x, n))
-        v_D = (m[2] > ylims[2] - 0.1*dr ? VECX : VEC0)
-        lambda = l/(Re*r*p.var.mass)
-        p.var.v += dt*lambda*v_D
-        gamma += dt*lambda
-    end
-    p.var.v = p.var.v/gamma
-end
 
 function main()
     domain = Rectangle(xlims = xlims, ylims = ylims)
-    grid = VoronoiGrid{PhysFields}(h, domain)
-    populate_vogel!(grid, dr, center = 0.5*VECX + 0.5*VECY)
-    #Random.seed!(123)
-    #populate_lloyd!(grid, dr, niterations = 20)
-    apply_unary!(grid, get_mass!)
-    for p in grid.polygons
-        if isboundary(p)
-            p.var.iswall = true
-            if p.x[2] > ylims[2] - 0.5*dr
-                p.var.islid = true
-            end
-        end
-    end
+    grid = VanillaGrid(domain, dr)
+    populate_vogel!(grid, center = 0.5*VECX + 0.5*VECY)
+    apply_unary!(grid, ic!)
     if !ispath(export_path)
         mkpath(export_path)
         @info "created a new path \""*export_path*"\""
@@ -123,23 +67,10 @@ function main()
 
     solver = PressureSolver(grid)
     @time for k = 0 : k_end
-        try
-            move!(grid, dt)
-            #lloyd_step!(grid, tau)
-            remesh!(grid)
-            #apply_local!(grid, stabilizer!, h_stab)
-            apply_binary!(grid, viscous_force!)
-            apply_unary!(grid, wall!)
-            accelerate!(grid, dt)
-            find_pressure!(solver, dt)
-            apply_binary!(grid, internal_force!)
-            stabilize!(grid)
-            accelerate!(grid, dt)
-        catch e
-            vtk_save(pvd_p)
-            vtk_save(pvd_c)
-            throw(e)
-        end
+        move!(grid, dt)
+        viscous_force!(grid, 1.0/Re, dt, noslip = true, vDirichlet = vDirichlet) 
+        find_pressure!(solver, dt)
+        pressure_force!(grid, dt)
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -161,32 +92,6 @@ function main()
 end
 
 
-function stabilize!(grid::VoronoiGrid)
-    @threads for p in grid.polygons
-        LapP = 0.0 #laplacian of pressure
-        for e in p.edges
-            if isboundary(e)
-                continue
-            end
-            q = grid.polygons[e.label]
-            LapP -= lr_ratio(p,q,e)*(p.var.P - q.var.P)
-        end
-        if LapP > 0.0
-            c = centroid(p)
-            p.var.a += 1.5*LapP/(p.var.mass)*(c - p.x)
-        end
-    end
-end
-
-
-function lloyd_step!(grid::VoronoiGrid, tau::Float64)
-    @threads for p in grid.polygons
-        c = centroid(p)
-        p.x = tau/(tau + dt)*p.x + dt/(tau + dt)*c 
-    end
-end
-
-
 #=
 ### Functions to extract results and create plots.
 =#
@@ -198,10 +103,10 @@ function compute_fluxes(grid::VoronoiGrid, res = 100)
     for i in 1:res
 		#x-velocity along y-centerline
 		x = RealVector(0.5, s[i])
-        v1[i] = point_value(grid, x, p -> p.var.v[1])
+        v1[i] = point_value(grid, x, p -> p.v[1])
 		#y-velocity along x-centerline
 		x = RealVector(s[i], 0.5)
-        v2[i] = point_value(grid, x, p -> p.var.v[2])
+        v2[i] = point_value(grid, x, p -> p.v[2])
     end
     #save results into csv
     data = DataFrame(s=s, v1=v1, v2=v2)

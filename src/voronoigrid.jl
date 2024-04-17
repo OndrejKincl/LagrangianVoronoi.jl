@@ -1,30 +1,32 @@
 mutable struct VoronoiGrid{T}
+    dr::Float64
     h::Float64
+    rr_max::Float64
     boundary_rect::Rectangle
     cell_list::CellList
     polygons::Vector{VoronoiPolygon{T}}
     index_containers::Vector{PreAllocVector{Int}}
-    rr_max::Float64
-    VoronoiGrid{T}(h::Number, boundary_rect::Rectangle) where T = begin
+    VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64) where T = begin
+        h = 2*dr
         cell_list = CellList(h, boundary_rect)
         polygons = VoronoiPolygon{T}[]
         index_containers = [PreAllocVector{Int}(POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
         return new{T}(
-            h, 
+            dr,
+            h,
+            100*dr^2,
             boundary_rect, 
             cell_list, 
             polygons, 
-            index_containers,
-            h
+            index_containers
         )
     end
 end 
 
-
+const VanillaGrid = VoronoiGrid{Nothing}
 
 # cut polygon poly using all other polygon seeds as cutting tools
 @inbounds function voronoicut!(grid::VoronoiGrid, poly::VoronoiPolygon)
-    poly.isbroken = false
     x = poly.x
     prr = influence_rr(poly)
     key0 = findkey(grid.cell_list, x)
@@ -36,8 +38,7 @@ end
             break
         end
         if (rr > grid.rr_max)
-            poly.isbroken = true
-            break
+            throw("The Voronoi Mesh has been destroyed.")
         end
         key = key0 + offset
         if !(checkbounds(Bool, grid.cell_list.cells, key))
@@ -96,10 +97,6 @@ function _getNeighbors(grid::VoronoiGrid, poly::VoronoiPolygon)
     return container
 end
 
-function limit_cell_diameter!(grid::VoronoiGrid, diameter::Float64)
-    grid.rr_max = diameter^2
-end
-
 function nearest_polygon(grid::VoronoiGrid, x::RealVector)::VoronoiPolygon
     key0 = findkey(grid.cell_list, x)
     rr_best = Inf
@@ -107,7 +104,7 @@ function nearest_polygon(grid::VoronoiGrid, x::RealVector)::VoronoiPolygon
     for node in grid.cell_list.magic_path
         rr_min = node.rr
         offset = node.key
-        if (rr_min > rr_best) || (rr_min > grid.rr_max)
+        if (rr_min > rr_best)
             break
         end
         key = key0 + offset

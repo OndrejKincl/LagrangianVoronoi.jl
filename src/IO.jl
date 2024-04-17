@@ -14,15 +14,10 @@ function export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
         sort_edges!(poly)
         # construct the meshcell
         n0 = length(verts)
-        if !poly.isbroken
-            for i in 1:length(poly.edges)
-                push!(verts, Vec3(poly.edges[i].v1))
-            end 
-            meshcell = (n0+1):(n0+length(poly.edges))
-        else
-            push!(verts, Vec3(poly.x))
-            meshcell = (n0+1,)
-        end
+        for i in 1:length(poly.edges)
+            push!(verts, Vec3(poly.edges[i].v1))
+        end 
+        meshcell = (n0+1):(n0+length(poly.edges))
         push!(polys, MeshCell(PolyData.Polys(), meshcell))
     end
     if isempty(verts)
@@ -56,12 +51,13 @@ function export_points(grid::VoronoiGrid, filename::String, vars::Symbol...)
     return vtk
 end
 
-function append_datasets!(vtk, grid::VoronoiGrid{T}, vars::Symbol...) where T
+function append_datasets!(vtk, grid::VoronoiGrid, vars::Symbol...)
+    Tp = eltype(grid.polygons)
     for fieldname in vars
-        if !(fieldname in fieldnames(T))
+        if !(fieldname in fieldnames(Tp))
             throw(ArgumentError(string("Cannot export variable ", fieldname, " because it does not exist.")))
         end
-        exportType = (fieldtype(T, fieldname) <: Number) ? Float64 : Vec3
-        vtk[string(fieldname)] = [exportType(getproperty(grid.polygons[i].var, fieldname)) for i in eachindex(grid.polygons)]
+        exportType = (fieldtype(Tp, fieldname) <: Number) ? Float64 : Vec3
+        vtk[string(fieldname)] = [exportType(getproperty(grid.polygons[i], fieldname)) for i in eachindex(grid.polygons)]
     end
 end
