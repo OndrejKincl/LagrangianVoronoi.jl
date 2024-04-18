@@ -27,8 +27,9 @@ function similar(x::ThreadedVec, type::Type{T} = eltype(x.val), n::Integer = len
     return ThreadedVec(zeros(type, n))
 end
 
+# TOO MUCH OVERHEAD --- NOT WORTH IT
+#=
 function dot(u::ThreadedVec{Float64}, v::ThreadedVec{Float64})::Float64
- 
     Nt = nthreads()
     Lt = length(u) ÷ Nt
     if length(u) != length(v)
@@ -57,13 +58,12 @@ function dot(u::ThreadedVec{Float64}, v::ThreadedVec{Float64})::Float64
         stot += fetch(s[j])
     end
     return stot
-
-    return dot(u.val,v.val)
 end
 
 function norm(x::ThreadedVec{Float64})::Float64
     return sqrt(dot(x,x))
 end
+=#
 
 function axpy!(a::Number, x::ThreadedVec{T}, y::ThreadedVec{T})::ThreadedVec{T} where T
     @batch for i in eachindex(x.val)

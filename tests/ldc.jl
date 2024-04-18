@@ -66,11 +66,11 @@ function main()
     k_frame = max(1, round(Int, t_end/(nframes*dt)))
 
     solver = PressureSolver(grid)
-    @time for k = 0 : k_end
+    for k = 0 : k_end
         move!(grid, dt)
         viscous_force!(grid, 1.0/Re, dt, noslip = true, vDirichlet = vDirichlet) 
         find_pressure!(solver, dt)
-        pressure_force!(grid, dt)
+        pressure_force!(grid, dt, stabilize = true)
         if ((k_end - k) % k_frame == 0)
             t = k*dt
             @show t
@@ -84,11 +84,12 @@ function main()
     end
     vtk_save(pvd_p)
     vtk_save(pvd_c)
-
     csv_data = DataFrame(time = time, energy = energy)
 	CSV.write(string(export_path, "/error_data.csv"), csv_data)
+
+    
     compute_fluxes(grid)
-    make_plot()
+    return
 end
 
 

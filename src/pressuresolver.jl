@@ -57,10 +57,10 @@ end
 
 struct PressureSolver{T}
     A::LaplaceOperator
-    b::ThreadedVec
+    b::ThreadedVec{Float64}
     M::JacobiPreconditioner
-    P::ThreadedVec
-    ms::MinresSolver
+    P::ThreadedVec{Float64}
+    ms::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
     grid::VoronoiGrid{T}
     verbose::Bool
     PressureSolver(grid::VoronoiGrid{T}; verbose = false) where T = begin
@@ -84,7 +84,7 @@ function refresh!(solver::PressureSolver{T}, dt::Float64, constant_density::Bool
             grad_P = VEC0
             grad_rho = VEC0
             p = polygons[i]
-            solver.P[i] = Float64(p.P)
+            solver.P[i] = p.P
             empty!(A.neighbors[i])
             empty!(A.lr_ratios[i])
             M.diag[i] = 0.0

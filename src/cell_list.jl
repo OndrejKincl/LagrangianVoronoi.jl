@@ -43,19 +43,17 @@ mutable struct CellList
     end
 end
 
+#=
 function Base.getindex(list::CellList, key::Key)::Cell
     return list.cells[key]
 end
+=#
 
-@inbounds function findkey(list::CellList, x::RealVector)::Key
-	try
-        x = x - list.origin
-        i1 = floor(Int, x[1]/list.h) + 1
-        i2 = floor(Int, x[2]/list.h) + 1
-		return Key(i1, i2)
-	catch #Int(x) fails when x is NaN or infinity
-		return KEYNULL
-	end
+@inline function findkey(list::CellList, x::RealVector)::Key
+	x = x - list.origin
+    @inbounds i1 = floor(Int, x[1]/list.h) + 1
+    @inbounds i2 = floor(Int, x[2]/list.h) + 1
+	return Key(i1, i2)
 end
 
 @inbounds function insert!(list::CellList, x::RealVector, label::Int)::Bool

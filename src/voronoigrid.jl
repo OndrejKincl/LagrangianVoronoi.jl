@@ -61,7 +61,7 @@ end
 
 @inbounds function remesh!(grid::VoronoiGrid)::Nothing
     # clear the cell list
-    @batch for cell in grid.cell_list.cells
+    for cell in grid.cell_list.cells
         empty!(cell)
     end
     # reset voronoi cells
