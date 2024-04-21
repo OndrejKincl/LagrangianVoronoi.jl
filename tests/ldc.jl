@@ -2,93 +2,64 @@
 
 module ldc
 
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters
-using SmoothedParticles:rDwendland2
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
-
 
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
-
-
-const Re = 100
-
-const rho0 = 1.0
-const xlims = (0.0, 1.0)
-const ylims = (0.0, 1.0)
-const N = 100 #resolution
+const Re = 100 # Reynolds number
+const N = 100 # resolution
 const dr = 1.0/N
-
 const dt = min(0.1*dr, 0.1*Re*dr^2)
-const t_end = 1.0
-const nframes = 100
-
-const export_path = "results/ldc$(Re)"
-
-export_vars = (:v, :P)
+const t_end = 10.0
+const export_path = "results/ldc/Re$(Re)N$(N)"
 
 # inital condition
 function ic!(p::VoronoiPolygon)
-    p.rho = rho0
-    p.mass = p.rho*area(p)
-end
-
-function find_energy(grid::VoronoiGrid)::Float64
-    E = 0.0
-    for p in grid.polygons
-        E += p.mass*norm_squared(p.v)
-    end
-    return E
+    p.rho = 1.0
+    p.mass = area(p)
 end
 
 function vDirichlet(x::RealVector)::RealVector
-    return (x[2] > ylims[2] - 0.1*dr ? VECX : VEC0)
+    return (x[2] > 1.0 - 0.1*dr ? VECX : VEC0)
 end
 
+mutable struct Simulation <: SimulationWorkspace
+    grid::GridNS
+    E::Float64
+    solver::PressureSolver{PolygonNS}
+    Simulation() = begin
+        domain = UnitRectangle()
+        grid = GridNS(domain, dr)
+        populate_lloyd!(grid, ic! = ic!)
+        return new(grid, 0.0, PressureSolver(grid))
+    end
+end
+
+function step!(sim::Simulation, t::Float64) 
+    move!(sim.grid, dt)
+    viscous_force!(sim.grid, 1.0/Re, dt, noslip = true, vDirichlet = vDirichlet) 
+    find_pressure!(sim.solver, dt)
+    pressure_force!(sim.grid,  dt)
+    return
+end
+
+function postproc!(sim::Simulation, t::Float64) 
+    sim.E = 0.5*sum(p -> p.mass*norm_squared(p.v), sim.grid.polygons)
+    println("energy = $(sim.E)")
+    return
+end
 
 function main()
-    domain = Rectangle(xlims = xlims, ylims = ylims)
-    grid = VanillaGrid(domain, dr)
-    populate_vogel!(grid, center = 0.5*VECX + 0.5*VECY)
-    apply_unary!(grid, ic!)
-    if !ispath(export_path)
-        mkpath(export_path)
-        @info "created a new path \""*export_path*"\""
-    end 
-    pvd_p = paraview_collection(export_path*"/points.pvd")
-    pvd_c = paraview_collection(export_path*"/cells.pvd")
-    nframe = 0
-    energy = Float64[]
-    time = Float64[]
-
-    k_end = round(Int, t_end/dt)
-    k_frame = max(1, round(Int, t_end/(nframes*dt)))
-
-    solver = PressureSolver(grid)
-    for k = 0 : k_end
-        move!(grid, dt)
-        viscous_force!(grid, 1.0/Re, dt, noslip = true, vDirichlet = vDirichlet) 
-        find_pressure!(solver, dt)
-        pressure_force!(grid, dt, stabilize = true)
-        if ((k_end - k) % k_frame == 0)
-            t = k*dt
-            @show t
-            push!(time, t)
-            push!(energy, find_energy(grid))
-            println("energy = ", energy[end])
-            pvd_c[t] = export_grid(grid, string(export_path, "/cframe", nframe, ".vtp"), export_vars...)
-            pvd_p[t] = export_points(grid, string(export_path, "/pframe", nframe, ".vtp"), export_vars...)
-            nframe += 1
-        end
-    end
-    vtk_save(pvd_p)
-    vtk_save(pvd_c)
-    csv_data = DataFrame(time = time, energy = energy)
-	CSV.write(string(export_path, "/error_data.csv"), csv_data)
-
-    
-    compute_fluxes(grid)
+    sim = Simulation()
+    @time run!(sim, dt, t_end, step!; 
+        postproc! = postproc!,
+        path = export_path, 
+        nframes = 100,
+        vtp_vars = (:v, :P),
+        csv_vars = (:E, )
+    )
+    compute_fluxes(sim.grid)
     return
 end
 
@@ -111,11 +82,11 @@ function compute_fluxes(grid::VoronoiGrid, res = 100)
     end
     #save results into csv
     data = DataFrame(s=s, v1=v1, v2=v2)
-	CSV.write(export_path*"/data.csv", data)
+	CSV.write(joinpath(export_path, "vprofile.csv"), data)
 	make_plot()
 end
 
-function make_plot(Re=Re)
+function make_plot()
 	ref_x2vy = CSV.read("reference/ldc-x2vy.csv", DataFrame)
 	ref_y2vx = CSV.read("reference/ldc-y2vx.csv", DataFrame)
 	propertyname = Symbol("Re", Re)
@@ -123,7 +94,7 @@ function make_plot(Re=Re)
 	ref_vx = getproperty(ref_y2vx, propertyname)
 	ref_x = ref_x2vy.x
 	ref_y = ref_y2vx.y
-	data = CSV.read("results/ldc$(Re)/data.csv", DataFrame)
+	data = CSV.read(joinpath(export_path, "vprofile.csv"), DataFrame)
     myfont = font(12)
 	p1 = plot(
 		data.s, data.v2,
@@ -138,19 +109,28 @@ function make_plot(Re=Re)
         guidefont=myfont, 
         legendfont=myfont,
 	)
-	scatter!(p1, ref_x, ref_vy, label = false, color = :orange, markersize = 4, markerstroke = stroke(1, :black), markershape = :circ)
+	scatter!(p1, 
+        ref_x, ref_vy, 
+        label = false, 
+        color = :orange, 
+        markersize = 4, 
+        markerstroke = stroke(1, :black), 
+        markershape = :circ
+    )
 	plot!(p1,
 		data.s, data.v1,
         label = "v",
-		linewidth = 2,
-		color = :royalblue,
-        xtickfont=myfont, 
-        ytickfont=myfont, 
-        guidefont=myfont, 
-        legendfont=myfont,
 	)
-	scatter!(p1, ref_y, ref_vx, label = false, color = :royalblue, markersize = 4, markerstroke = stroke(1, :black), markershape = :square)
-	savefig(p1, "results/ldc$(Re).pdf")
+	scatter!(p1, 
+        ref_y, 
+        ref_vx, 
+        label = false, 
+        color = :royalblue, 
+        markersize = 4, 
+        markerstroke = stroke(1, :black), 
+        markershape = :square
+    )
+	savefig(p1, joinpath(export_path, "vprofile.pdf"))
 end
 
 

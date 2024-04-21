@@ -12,30 +12,15 @@ const SIGNUM_EPS = 2*eps(Float64)
     return 0
 end
 
-mutable struct VoronoiPolygon{T}
-    x::RealVector # position
-    v::RealVector # velocity
-    a::RealVector # acceleration
-    P::Float64    # pressure
-    rho::Float64  # density
-    mass::Float64 # mass (duh)
-    var::T        # user-defined variables
-    edges::PreAllocVector{Edge}  # sides of the polygon (in no particular order)
-    VoronoiPolygon{T}(x::RealVector) where T = new{T}(
-        x,
-        VEC0,
-        VEC0,
-        0.0,
-        0.0,
-        0.0,
-        T(),
-        PreAllocVector{Edge}(POLYGON_SIZEHINT),
-    )
+abstract type VoronoiPolygon end
+
+function PreAllocVector(::Type{T}, size::Int)::Vector{T} where T
+    vec = Vector{T}()
+    sizehint!(vec, size)
+    return vec
 end
 
-# when you have no user-defined variables
-const VanillaPolygon = VoronoiPolygon{Nothing}
-
+emptypolygon() = PreAllocVector(Edge, POLYGON_SIZEHINT)
 
 @inbounds function reset!(p::VoronoiPolygon, boundary_rect::Rectangle)
     empty!(p.edges)
@@ -49,9 +34,9 @@ const VanillaPolygon = VoronoiPolygon{Nothing}
     push!(p.edges, Edge(C, B))
 end
 
-# intersects a VoronoiPolygon with the halfplane of all points closer to y than to p.x
-# use label for newly created edge
-# this code has very sharp edges
+
+# Intersects a VoronoiPolygon with the halfplane of all points closer to y than to p.x.
+# Use label for newly created edge. This code has very sharp edges, modify with caution.
 @inbounds function voronoicut!(p::VoronoiPolygon, y::RealVector, label::Int)::Bool
     diff = y - p.x
     mid = 0.5*(y + p.x)

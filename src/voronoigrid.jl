@@ -4,13 +4,13 @@ mutable struct VoronoiGrid{T}
     rr_max::Float64
     boundary_rect::Rectangle
     cell_list::CellList
-    polygons::Vector{VoronoiPolygon{T}}
-    index_containers::Vector{PreAllocVector{Int}}
+    polygons::Vector{T}
+    index_containers::Vector{Vector{Int}}
     VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64) where T = begin
         h = 2*dr
         cell_list = CellList(h, boundary_rect)
-        polygons = VoronoiPolygon{T}[]
-        index_containers = [PreAllocVector{Int}(POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
+        polygons = T[]
+        index_containers = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
         return new{T}(
             dr,
             h,
@@ -21,12 +21,9 @@ mutable struct VoronoiGrid{T}
             index_containers
         )
     end
-end 
+end
 
-const VanillaGrid = VoronoiGrid{Nothing}
-
-# cut polygon poly using all other polygon seeds as cutting tools
-@inbounds function voronoicut!(grid::VoronoiGrid, poly::VoronoiPolygon)
+@inbounds function voronoicut!(grid::VoronoiGrid{T}, poly::T) where T <: VoronoiPolygon
     x = poly.x
     prr = influence_rr(poly)
     key0 = findkey(grid.cell_list, x)
@@ -86,7 +83,7 @@ end
     return
 end
 
-function _getNeighbors(grid::VoronoiGrid, poly::VoronoiPolygon)
+function _getNeighbors(grid::VoronoiGrid{T}, poly::T) where T <: VoronoiPolygon
     container = grid.index_containers[Threads.threadid()]
     empty!(container)
     for e in poly.edges
@@ -97,7 +94,7 @@ function _getNeighbors(grid::VoronoiGrid, poly::VoronoiPolygon)
     return container
 end
 
-function nearest_polygon(grid::VoronoiGrid, x::RealVector)::VoronoiPolygon
+function nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T where T <: VoronoiPolygon
     key0 = findkey(grid.cell_list, x)
     rr_best = Inf
     i_best = 0
@@ -121,10 +118,4 @@ function nearest_polygon(grid::VoronoiGrid, x::RealVector)::VoronoiPolygon
         end
     end
     return grid.polygons[i_best]
-end
-
-function point_value(grid::VoronoiGrid, x::RealVector, fun::Function)
-    p = nearest_polygon(grid, x)
-    L = ls_reconstruction(LinearExpansion, grid, p, fun) 
-    return fun(p) + dot(L, x - p.x)
 end

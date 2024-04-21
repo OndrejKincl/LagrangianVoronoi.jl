@@ -5,19 +5,20 @@ using StaticArrays
 using WriteVTK
 using Base.Threads
 using Polyester
-
-include("preallocvector.jl")
+using CSV
+using DataFrames
+using Krylov
 
 include("geometry.jl")
-export RealVector, RealMatrix, VEC0, VECX, VECY, VECNULL, Edge, Rectangle, len, isinside, norm_squared, verts
+export RealVector, RealMatrix, VEC0, VECX, VECY, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts
 
 include("polygon.jl")
-export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio
+export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio, POLYGON_SIZEHINT, PreAllocVector
 
 include("cell_list.jl")
 
 include("voronoigrid.jl")
-export VoronoiGrid, VanillaGrid, remesh!, limit_cell_diameter!, nearest_polygon, point_value
+export VoronoiGrid, remesh!, nearest_polygon
 
 include("IO.jl")
 export export_grid, export_points
@@ -25,23 +26,29 @@ export export_grid, export_points
 include("apply.jl")
 export apply_binary!, apply_unary!, apply_local!
 
-include("assembler.jl")
-export assemble_system
-
-include("ls_reconstruction.jl")
+include("movingls.jl")
 export LinearExpansion, QuadraticExpansion, CubicExpansion
-export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral
+export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral, point_value
 
 include("populate.jl")
 export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, get_mass!
 
-include("threadedvector.jl")
+include("utils/threadedvec.jl")
 export ThreadedVec
 
-include("physics.jl")
+include("utils/iterators.jl")
+export neighbors, boundaries
+
+include("utils/run.jl")
+export SimulationWorkspace, run!
+
+include("NavierStokes/definitions.jl")
+export GridNS, PolygonNS
+
+include("NavierStokes/physics.jl")
 export move!, pressure_force!, viscous_force!
 
-include("pressuresolver.jl")
+include("NavierStokes/pressuresolver.jl")
 export PressureSolver, find_pressure!
 
 end

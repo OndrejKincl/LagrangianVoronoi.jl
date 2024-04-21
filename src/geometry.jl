@@ -27,14 +27,14 @@ struct Rectangle
     # corners of the rectangle
     xmin::RealVector
     xmax::RealVector
-    Rectangle(; xlims::Tuple{Number, Number}, ylims::Tuple{Number, Number}) = begin
-        xmin = RealVector(xlims[1], ylims[1])
-        xmax = RealVector(xlims[2], ylims[2])
-        if (xmin[1] >= xmax[1]) || (xmin[2] >= xmax[2])
-            throw(DomainError("Rectangle with inverted bounds."))
-        end
-        return new(xmin, xmax)
-    end
+end
+
+UnitRectangle() = Rectangle(VEC0, VECX + VECY)
+
+Rectangle(; xlims::Tuple{Number, Number}, ylims::Tuple{Number, Number}) = begin
+    xmin = RealVector(xlims[1], ylims[1])
+    xmax = RealVector(xlims[2], ylims[2])
+    return Rectangle(xmin, xmax)
 end
 
 function isinside(r::Rectangle, x::RealVector)::Bool

@@ -1,17 +1,15 @@
-using Base.Threads
-using Krylov
 import Base: eltype, size
 import LinearAlgebra: mul!
 
 struct LaplaceOperator # actually minus Laplace 
     n::Int
-    neighbors::Vector{PreAllocVector{Int}}
-    lr_ratios::Vector{PreAllocVector{Float64}}
+    neighbors::Vector{Vector{Int}}
+    lr_ratios::Vector{Vector{Float64}}
     ones::ThreadedVec{Float64}
     LaplaceOperator(grid) = begin
         n = length(grid.polygons)
-        neighbors = [PreAllocVector{Int}(POLYGON_SIZEHINT) for _ in 1:n]
-        lr_ratios = [PreAllocVector{Float64}(POLYGON_SIZEHINT) for _ in 1:n]
+        neighbors = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:n]
+        lr_ratios = [PreAllocVector(Float64, POLYGON_SIZEHINT) for _ in 1:n]
         ones = ThreadedVec([1.0 for _ in 1:n])
         return new(n, neighbors, lr_ratios, ones)
     end
@@ -24,7 +22,7 @@ function mul!(y::ThreadedVec{Float64}, A::LaplaceOperator, x::ThreadedVec{Float6
             y[i] = init
             neighbors = A.neighbors[i]
             lr_ratios = A.lr_ratios[i]
-            for k in 1:length(neighbors)
+            for k in eachindex(neighbors)
                 j = neighbors[k]
                 y[i] += lr_ratios[k]*(x[i] - x[j])
             end
@@ -88,10 +86,7 @@ function refresh!(solver::PressureSolver{T}, dt::Float64, constant_density::Bool
             empty!(A.neighbors[i])
             empty!(A.lr_ratios[i])
             M.diag[i] = 0.0
-            for e in p.edges
-                if isboundary(e)
-                    continue
-                end
+            for (q,e) in neighbors(p, solver.grid)
                 j = e.label
                 push!(A.neighbors[i], j)
                 q = polygons[j]

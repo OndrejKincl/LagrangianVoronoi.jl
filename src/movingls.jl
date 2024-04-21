@@ -18,7 +18,9 @@ function power_vector(::Type{CubicExpansion}, x::RealVector)::CubicExpansion
     return CubicExpansion(x[1], x[2], x[1]*x[1], x[1]*x[2], x[2]*x[2], x[1]*x[1]*x[1], x[1]*x[1]*x[2], x[1]*x[2]*x[2], x[2]*x[2]*x[2])
 end
 
-function ls_reconstruction(
+
+# Finds the Taylor expansion of a given function using moving least squares.
+function movingls(
         ::Type{T},
         grid::VoronoiGrid, p::VoronoiPolygon, fun::Function; 
         h::Number = grid.h,  kernel::Function = gaussian_kernel
@@ -88,4 +90,10 @@ function integral(p::VoronoiPolygon, val::Float64, taylor::CubicExpansion)::Floa
         int += (25*A/48)*poly_eval(val, taylor, -4/5*p.x + 1/5*e.v1 + 3/5*e.v2)
     end
     return int
+end
+
+function point_value(grid::VoronoiGrid, x::RealVector, fun::Function)
+    p = nearest_polygon(grid, x)
+    L = movingls(LinearExpansion, grid, p, fun) 
+    return fun(p) + dot(L, x - p.x)
 end
