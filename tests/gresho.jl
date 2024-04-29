@@ -18,8 +18,8 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
-const t_end =  1.0
-const nframes = 100
+const t_end =  2.0
+const nframes = 200
 
 const h_stab = 2.0*dr
 const P_stab = 0.01*rho0*v_char^2
@@ -65,9 +65,9 @@ end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
-    apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    #apply_local!(sim.grid, SPH_stabilizer!, h_stab)
     find_pressure!(sim.solver, dt)
-    pressure_force!(sim.grid, dt)
+    pressure_force!(sim.grid, dt, stabilize=false)
     return
 end
 
@@ -89,7 +89,8 @@ function main()
     sim = Simulation()
     run!(sim, dt, t_end, step!; path = export_path, 
         vtp_vars = (:v, :P), csv_vars = (:E, :l2_err),
-        postproc! = postproc!
+        postproc! = postproc!,
+        nframes = nframes
     )
     # store velocity profile along midline
     vy = Float64[]
@@ -113,17 +114,30 @@ function plot_midline()
         csv_data.vy_exact,
         xlabel = L"x",
         ylabel = L"v_y",
-        color = :blue,
-        linestyle = :dash,
-        bottom_margin = 5mm
+        label = "EXACT",
+        color = :black,
+        axisratio = 0.5,
+        bottom_margin = 5mm,
+        linewidth = 2.0
+    )
+    AREPO_ref = CSV.read("reference/AREPO.csv", DataFrame)
+    plot!(
+        plt,
+        AREPO_ref.x,
+        AREPO_ref.vy,
+        label = "AREPO (Springel et al)",
+        markershape = :hex,
+        markersize = 3,
+        linewidth = 2.0
     )
     plot!(
         plt,
         csv_data.x,
-        csv_data.vy,
-        label = "simulation",
+        csv_data.vy_sim,
+        label = "ILVA",
         markershape = :hex,
-        markersize = 2,
+        markersize = 3,
+        linewidth = 2.0
     )
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end

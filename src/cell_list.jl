@@ -1,5 +1,5 @@
 const CELL_SIZEHINT = 8
-const Cell = Vector{Int}
+const Cell = FastVector{Int}
 const Key = CartesianIndex{2}
 const KEYNULL = Key(0, 0)
 
@@ -23,7 +23,7 @@ mutable struct CellList
         origin = boundary_rect.xmin - RealVector(h,h)
         n1 = floor(Int, (boundary_rect.xmax[1] - boundary_rect.xmin[1])/h) + 3
 		n2 = floor(Int, (boundary_rect.xmax[2] - boundary_rect.xmin[2])/h) + 3
-        cells = [PreAllocVector(Cell, CELL_SIZEHINT) for _ in 1:n1, _ in 1:n2]
+        cells = [Cell(CELL_SIZEHINT) for _ in 1:n1, _ in 1:n2]
         locks = [ReentrantLock() for _ in 1:n1, _ in 1:n2]
         # the path which is used for visiting neighbors
         magic_path = PathNode[]

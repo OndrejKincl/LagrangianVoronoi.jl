@@ -12,6 +12,9 @@ using Krylov
 include("geometry.jl")
 export RealVector, RealMatrix, VEC0, VECX, VECY, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts
 
+include("utils/fastvector.jl")
+export FastVector
+
 include("polygon.jl")
 export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio, POLYGON_SIZEHINT, PreAllocVector
 

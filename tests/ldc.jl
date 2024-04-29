@@ -4,15 +4,20 @@ module ldc
 
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
+
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
+using SmoothedParticles:rDwendland2
 
-const Re = 100 # Reynolds number
+const Re = 1000 # Reynolds number
 const N = 100 # resolution
 const dr = 1.0/N
 const dt = min(0.1*dr, 0.1*Re*dr^2)
-const t_end = 10.0
+const t_end = 100.0
 const export_path = "results/ldc/Re$(Re)N$(N)"
+const tau = 0.1
+const h_stab = 2.0*dr
+const P_stab = 0.01
 
 # inital condition
 function ic!(p::VoronoiPolygon)
@@ -36,11 +41,26 @@ mutable struct Simulation <: SimulationWorkspace
     end
 end
 
+function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
+    (h_stab < p.x[1] < 1.0 - h_stab) || return
+    (h_stab < p.x[2] < 1.0 - h_stab) || return
+	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(2*P_stab)*(p.x - q.x)
+    return
+end
+
 function step!(sim::Simulation, t::Float64) 
     move!(sim.grid, dt)
+    #apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    apply_unary!(sim.grid, lloyd_stabilizer!)
+    remesh!(sim.grid)
     viscous_force!(sim.grid, 1.0/Re, dt, noslip = true, vDirichlet = vDirichlet) 
     find_pressure!(sim.solver, dt)
     pressure_force!(sim.grid,  dt)
+    return
+end
+
+function lloyd_stabilizer!(p::VoronoiPolygon)
+    p.x = (tau*p.x + dt*centroid(p))/(tau + dt)
     return
 end
 
@@ -54,8 +74,8 @@ function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; 
         postproc! = postproc!,
-        path = export_path, 
-        nframes = 100,
+        path = export_path,
+        nframes = 500,
         vtp_vars = (:v, :P),
         csv_vars = (:E, )
     )

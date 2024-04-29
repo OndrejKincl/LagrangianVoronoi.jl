@@ -20,7 +20,7 @@ function PreAllocVector(::Type{T}, size::Int)::Vector{T} where T
     return vec
 end
 
-emptypolygon() = PreAllocVector(Edge, POLYGON_SIZEHINT)
+emptypolygon() = FastVector{Edge}(POLYGON_SIZEHINT)
 
 @inbounds function reset!(p::VoronoiPolygon, boundary_rect::Rectangle)
     empty!(p.edges)

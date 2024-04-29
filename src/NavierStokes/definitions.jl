@@ -8,7 +8,7 @@
     rho::Float64  = 0.0  # density
     mass::Float64 = 0.0
     # sides of the polygon (in no particular order)
-    edges::Vector{Edge} = emptypolygon()
+    edges::FastVector{Edge} = emptypolygon()
 end
 
 PolygonNS(x::RealVector)::PolygonNS = PolygonNS(x=x)
