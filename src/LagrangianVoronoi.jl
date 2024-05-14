@@ -54,4 +54,10 @@ export move!, pressure_force!, viscous_force!
 include("NavierStokes/pressuresolver.jl")
 export PressureSolver, find_pressure!
 
+include("compressible/definitions.jl")
+export GridNSc, PolygonNSc
+
+include("compressible/solver.jl")
+export CompressibleSolver, find_pressure!
+
 end
