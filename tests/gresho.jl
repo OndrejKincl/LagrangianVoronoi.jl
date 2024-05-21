@@ -133,7 +133,7 @@ function plot_midline()
     plot!(
         plt,
         csv_data.x,
-        csv_data.vy_sim,
+        csv_data.vy,
         label = "ILVA",
         markershape = :hex,
         markersize = 3,
