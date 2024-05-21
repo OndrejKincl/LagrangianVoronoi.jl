@@ -9,6 +9,7 @@
     mass::Float64 = 0.0
     c::Float64    = 0.0  # sound speed
     s::Float64    = 0.0  # entropy
+    e::Float64    = 0.0
     # sides of the polygon (in no particular order)
     edges::FastVector{Edge} = emptypolygon()
 end

@@ -15,29 +15,34 @@ struct CompressibleOperator
     end
 end
 
-function mul!(y::ThreadedVec{Float64}, A::CompressibleOperator, x::ThreadedVec{Float64})::ThreadedVec{Float64}
+@inbounds function mul!(y::ThreadedVec{Float64}, A::CompressibleOperator, x::ThreadedVec{Float64})::ThreadedVec{Float64}
     @batch for i in 1:A.n
         p = A.grid.polygons[i]
-        grad[i] = VEC0
+        A.grad[i] = VEC0
         k = 0
+        lrrs = A.lrr[i]
         for (q,e) in neighbors(p, A.grid) 
+            lrr = lrrs[k += 1]
             j = e.label
             m = 0.5*(e.v1 + e.v2)
-            grad[i] -= lrr[k += 1]*(x[i] - x[j])*(m - p.x)
+            A.grad[i] -= lrr*(x[i] - x[j])*(m - p.x)
         end
-        grad[i] = grad[i]/p.mass
+        A.grad[i] = A.grad[i]/p.mass
     end
     @batch for i in 1:A.n
+        y[i] = 0.0
         p = A.grid.polygons[i]
         k = 0
+        lrrs = A.lrr[i]
         for (q,e) in neighbors(p, A.grid)    
-            lrr = A.lrr[k += 1]
+            lrr = lrrs[k += 1]
             j = e.label
             m = 0.5*(e.v1 + e.v2)
-            y[i] += lrr*dot(m - q.x, A.grad[i] - A.grad[j])
-            y[i] -= lrr*dot(p.x - q.x, A.grad[i])
+            z = 0.5*(p.x + q.x)
+            y[i] += lrr*dot(m - z, A.grad[i] - A.grad[j])
+            y[i] -= lrr*dot(p.x - q.x, 0.5*(A.grad[i] + A.grad[j]))
         end
-        y[i] = x[i]/(p.rho*p.c^2) - (dt^2)*p.rho*y[i]/p.mass
+        y[i] = p.mass*x[i]/(A.dt*p.rho*p.c)^2 - y[i]
     end
     return y
 end
@@ -52,7 +57,7 @@ struct CompressibleSolver
     A::CompressibleOperator
     b::ThreadedVec{Float64}
     P::ThreadedVec{Float64}
-    ms::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
+    ms::CgSolver{Float64, Float64, ThreadedVec{Float64}}
     grid::GridNSc
     verbose::Bool
     CompressibleSolver(grid::GridNSc, dt::Float64; verbose = false) = begin
@@ -60,32 +65,35 @@ struct CompressibleSolver
         A = CompressibleOperator(grid, dt)
         b = ThreadedVec{Float64}(undef, n)
         P = ThreadedVec{Float64}(undef, n)
-        ms = MinresSolver(A, b)
-        return new(A, b, P, ms, grid, verbose, dt)
+        ms = CgSolver(A, b)
+        return new(A, b, P, ms, grid, verbose)
     end
 end
 
-function refresh!(solver::CompressibleSolver)
+@inbounds function refresh!(solver::CompressibleSolver)
     A = solver.A
     polygons = solver.grid.polygons
     @batch for i in 1:A.n
         p = polygons[i]
         solver.P[i] = p.P
         empty!(A.lrr[i])
+        solver.b[i] = 0.0
         for (q,e) in neighbors(p, solver.grid)
-            push!(A.lrr[i], lr_ratio(p, q, e))
+            lrr = lr_ratio(p,q,e)
+            push!(A.lrr[i], lrr)
             m = 0.5*(e.v1 + e.v2)
-            solver.b[i] += lrr*dot(m - q.x, p.v - q.v)
-            solver.b[i] -= lrr*dot(p.x - q.x, p.v)
+            z = 0.5*(p.x + q.x)
+            solver.b[i] += lrr*dot(m - z, p.v - q.v)
+            solver.b[i] -= lrr*dot(p.x - q.x, 0.5*(p.v + q.v))
         end
-        solver.b[i] = p.P/(p.rho*p.c^2) - A.dt*p.rho*solver.b[i]/p.mass
+        solver.b[i] = p.mass*p.P/(A.dt*p.rho*p.c)^2 - solver.b[i]/(A.dt)
     end
 end
 
 
 function find_pressure!(solver::CompressibleSolver)
     refresh!(solver)
-    minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
+    cg!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-8, rtol = 1e-8, itmax = 1000)
     x = solution(solver.ms)
     if !solver.ms.stats.solved
         @warn "solver did not converge"
@@ -93,5 +101,44 @@ function find_pressure!(solver::CompressibleSolver)
     polygons = solver.grid.polygons
     @batch for i in eachindex(x)
         @inbounds polygons[i].P = x[i]
+    end
+end
+
+function posdef_test(solver::CompressibleSolver, tol = 1e-6)
+    A = solver.A
+    x = ThreadedVec{Float64}(undef, A.n)
+    y = ThreadedVec{Float64}(undef, A.n)
+    for i in 1:A.n
+        x[i] = rand()
+    end
+    mul!(y, A, x)
+    dot = LinearAlgebra.dot(y, x)
+    @show dot
+    if dot < -tol
+        @warn "is not posdef"
+    else
+        @info "is posdef"
+    end
+end
+
+function symm_test(solver::CompressibleSolver, tol = 1e-6)
+    A = solver.A
+    x1 = ThreadedVec{Float64}(undef, A.n)
+    x2 = ThreadedVec{Float64}(undef, A.n)
+    y = ThreadedVec{Float64}(undef, A.n)
+    for i in 1:A.n
+        x1[i] = rand()
+        x2[i] = rand()
+    end
+    mul!(y, A, x1)
+    dot1 = LinearAlgebra.dot(y, x2)
+    mul!(y, A, x2)
+    dot2 = LinearAlgebra.dot(y, x1)
+    err = dot1 - dot2
+    @show err
+    if err > tol
+        @warn "is not symmetric"
+    else
+        @info "is symmetric"
     end
 end

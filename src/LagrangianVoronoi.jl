@@ -60,4 +60,7 @@ export GridNSc, PolygonNSc
 include("compressible/solver.jl")
 export CompressibleSolver, find_pressure!
 
+include("compressible/physics.jl")
+export pressure_force!
+
 end

@@ -20,8 +20,9 @@ const dr = 1.0/N
 const dt = 0.02*dr/v_char
 const t_end =  1.0
 const nframes = 100
-const c = 0.1  # sound speed
+const c0 = 1.0/3  # sound speed
 const tau = 0.1
+const gamma = 1.4
 
 const h_stab = 2.0*dr
 const P_stab = 0.05*rho0*v_char^2
@@ -41,19 +42,26 @@ end
 
 function h_exact(x::RealVector)::Float64
     return @match norm(x) begin
-        r, if r < 0.2 end => 5.0 + 12.5*r^2
-        r, if r < 0.4 end => 9.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
-        _ => 3 + 4*log(2)
+        r, if r < 0.2 end => 12.5*r^2
+        r, if r < 0.4 end => 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
+        _ => -2.0 + 4*log(2)
     end
 end
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
     p.v = v_exact(p.x)
-    h = 0.0 #h_exact(p.x) - (3 + 4*log(2))
-    p.rho = rho0*exp(h/c^2)
-    p.c = c
-    p.P = (c > 100.0) ? rho0*h : rho0*c^2*(p.rho - rho0)
+    h = h_exact(p.x)
+    P0 = rho0*c0^2/gamma
+    p.rho = rho0*((gamma-1.0)*h/c0^2 + 1.0)^(1.0/(gamma - 1.0))
+    p.P = P0*(p.rho/rho0)^gamma
+    #p.P = rho0*h + P0
+    #p.rho = rho0*(p.P/P0)^(1.0/gamma)
+    p.e = 0.5*norm_squared(p.v) + p.P/((gamma - 1.0)*p.rho)
+end
+
+function assign_mass!(p::VoronoiPolygon)
+    p.mass = p.rho*area(p)
 end
 
 mutable struct Simulation <: SimulationWorkspace
@@ -78,13 +86,19 @@ function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
     return
 end
 
-function assign_mass!(p::VoronoiPolygon)
-    p.mass = p.rho*area(p)
-end
-
 function find_rho!(p::VoronoiPolygon)
     p.rho = p.mass/area(p)
+    p.P = (gamma - 1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
+    p.c = sqrt(abs(gamma*p.P/p.rho))
     #p.rho = rho0 + p.P/c^2
+end
+
+function energy_balance!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
+    lrr = lr_ratio(p,q,e)
+    m = 0.5*(e.v1 + e.v2)
+    z = 0.5*(p.x + q.x)
+    p.e += dt/p.mass*lrr*dot(m - z, p.P*q.v - q.P*p.v)
+    p.e += dt/p.mass*lrr*dot(p.x - q.x, 0.5*(p.P*q.v + q.P*p.v))
 end
 
 function lloyd_stabilizer!(p::VoronoiPolygon)
@@ -96,12 +110,13 @@ function step!(sim::Simulation, t::Float64)
     #apply_unary!(sim.grid, lloyd_stabilizer!)
     move!(sim.grid, dt)
     apply_unary!(sim.grid, find_rho!)
-    viscous_force!(sim.grid, artificial_visc, dt) 
+    #viscous_force!(sim.grid, artificial_visc, dt) 
     apply_local!(sim.grid, SPH_stabilizer!, h_stab)
-    E0 = sum(p -> 0.5*p.mass*norm_squared(p.v), sim.grid.polygons, init = 0.0)
+    E0 = sum(p -> p.mass*p.e, sim.grid.polygons, init = 0.0)
     find_pressure!(sim.solver)
+    apply_binary!(sim.grid, energy_balance!)
     pressure_force!(sim.grid, dt, stabilize=false)
-    E1 = sum(p -> 0.5*p.mass*norm_squared(p.v), sim.grid.polygons, init = 0.0)
+    E1 = sum(p -> p.mass*p.e, sim.grid.polygons, init = 0.0)
     if E1 > E0 + 1e-8
         @show E1 - E0
         @warn "energy growth detected"
@@ -115,7 +130,7 @@ function postproc!(sim::Simulation, t::Float64)
     sim.E = 0.0
     for p in sim.grid.polygons
         sim.l2_err += area(p)*norm_squared(p.v - v_exact(p.x))
-        sim.E += 0.5*p.mass*norm_squared(p.v)
+        sim.E += p.mass*p.e
     end
     sim.l2_err = sqrt(sim.l2_err)
     @show sim.E
@@ -126,7 +141,7 @@ end
 function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :P, :rho), csv_vars = (:E, :l2_err),
+        vtp_vars = (:v, :P, :rho, :e), csv_vars = (:E, :l2_err),
         postproc! = postproc!,
         nframes = nframes
     )

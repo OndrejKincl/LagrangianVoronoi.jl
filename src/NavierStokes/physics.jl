@@ -45,7 +45,10 @@ function pressure_force!(grid::VoronoiGrid, dt::Float64; stabilize = true)
             end
             if LapP > 0.0
                 c = centroid(p)
-                p.a += 1.5*LapP/(p.mass)*(c - p.x)
+                acc = 1.5*LapP/(p.mass)*(c - p.x)
+                if dot(acc, p.v + dt*p.a) < 0.0
+                    p.a += acc
+                end 
             end
         end
     end
