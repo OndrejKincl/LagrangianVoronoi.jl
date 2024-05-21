@@ -1,5 +1,5 @@
 # LagrangainVoronoi.jl
-A numerical library for Lagrangian Voronoi method in Julia. 
+A numerical library for Lagrangian Voronoi method in [Julia](https://julialang.org/). 
 
 ## Install prerequisites
 Run the following command in Julia terminal:
