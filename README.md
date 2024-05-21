@@ -1,9 +1,7 @@
-## LagrangainVoronoi.jl
-
+# LagrangainVoronoi.jl
 A numerical library for Lagrangian Voronoi method in Julia. 
 
-# Install prerequisites
-
+## Install prerequisites
 Run the following command in Julia terminal:
 ```
 using Pkg
@@ -24,3 +22,9 @@ deps = [
 ]
 Pkg.add(deps)
 ```
+## Quick start
+Clone this repository. Open the test folder and run from terminal/console:
+```
+julia -t 1 gresho.jl
+```
+You may replace 1 with the number of threads available on your computer. Wait for the simulation to finish. To see the results, download [paraview](https://www.paraview.org/download/). Use it to open the `result.pvd` file. 
