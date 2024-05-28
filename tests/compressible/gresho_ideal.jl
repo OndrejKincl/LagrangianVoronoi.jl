@@ -17,10 +17,10 @@ const ylims = (-0.5, 0.5)
 const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.02*dr/v_char
+const dt = 0.1*dr/v_char
 const t_end =  1.0
 const nframes = 100
-const c0 = 1.0/3  # sound speed
+const c0 = 10.0  # sound speed
 const tau = 0.1
 const gamma = 1.4
 
@@ -51,10 +51,11 @@ end
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
     p.v = v_exact(p.x)
-    h = h_exact(p.x)
     P0 = rho0*c0^2/gamma
-    p.rho = rho0*((gamma-1.0)*h/c0^2 + 1.0)^(1.0/(gamma - 1.0))
-    p.P = P0*(p.rho/rho0)^gamma
+    h0 = c0^2/(gamma - 1.0)
+    h = h_exact(p.x) + h0
+    p.rho = rho0*abs(h/h0)^(1.0/(gamma - 1.0))
+    p.P = P0*abs(p.rho/rho0)^gamma
     #p.P = rho0*h + P0
     #p.rho = rho0*(p.P/P0)^(1.0/gamma)
     p.e = 0.5*norm_squared(p.v) + p.P/((gamma - 1.0)*p.rho)
@@ -72,7 +73,7 @@ mutable struct Simulation <: SimulationWorkspace
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
-        populate_circ!(grid, ic! = ic!)
+        populate_rect!(grid, ic! = ic!)
         remesh!(grid)
         apply_unary!(grid, assign_mass!)
         return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
@@ -80,26 +81,13 @@ mutable struct Simulation <: SimulationWorkspace
 end
 
 function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
-    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
+    #(xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
+    #(ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
 	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(P_stab/p.rho + P_stab/q.rho)*(p.x - q.x)
     return
 end
 
-function find_rho!(p::VoronoiPolygon)
-    p.rho = p.mass/area(p)
-    p.P = (gamma - 1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
-    p.c = sqrt(abs(gamma*p.P/p.rho))
-    #p.rho = rho0 + p.P/c^2
-end
 
-function energy_balance!(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)
-    lrr = lr_ratio(p,q,e)
-    m = 0.5*(e.v1 + e.v2)
-    z = 0.5*(p.x + q.x)
-    p.e += dt/p.mass*lrr*dot(m - z, p.P*q.v - q.P*p.v)
-    p.e += dt/p.mass*lrr*dot(p.x - q.x, 0.5*(p.P*q.v + q.P*p.v))
-end
 
 function lloyd_stabilizer!(p::VoronoiPolygon)
     p.x = (tau*p.x + dt*centroid(p))/(tau + dt)
@@ -109,18 +97,14 @@ end
 function step!(sim::Simulation, t::Float64)
     #apply_unary!(sim.grid, lloyd_stabilizer!)
     move!(sim.grid, dt)
-    apply_unary!(sim.grid, find_rho!)
-    #viscous_force!(sim.grid, artificial_visc, dt) 
+    ideal_eos!(sim.grid, gamma)
+    viscous_force!(sim.grid, artificial_visc, dt) 
+    #viscous_step!(sim.grid, dt, dr, 0.001)
+    ideal_pressurefix!(sim.grid, gamma, dt)
     apply_local!(sim.grid, SPH_stabilizer!, h_stab)
-    E0 = sum(p -> p.mass*p.e, sim.grid.polygons, init = 0.0)
     find_pressure!(sim.solver)
-    apply_binary!(sim.grid, energy_balance!)
+    energy_balance!(sim.grid, dt)
     pressure_force!(sim.grid, dt, stabilize=false)
-    E1 = sum(p -> p.mass*p.e, sim.grid.polygons, init = 0.0)
-    if E1 > E0 + 1e-8
-        @show E1 - E0
-        @warn "energy growth detected"
-    end
     return
 end
 

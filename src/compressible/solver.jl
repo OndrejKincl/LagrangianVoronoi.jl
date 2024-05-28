@@ -96,7 +96,7 @@ function find_pressure!(solver::CompressibleSolver)
     cg!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-8, rtol = 1e-8, itmax = 1000)
     x = solution(solver.ms)
     if !solver.ms.stats.solved
-        @warn "solver did not converge"
+        throw("solver did not converge")
     end
     polygons = solver.grid.polygons
     @batch for i in eachindex(x)

@@ -61,6 +61,7 @@ include("compressible/solver.jl")
 export CompressibleSolver, find_pressure!
 
 include("compressible/physics.jl")
-export pressure_force!
+export pressure_force!, energy_balance!, ideal_eos!, ideal_pressurefix!, viscous_step!
+
 
 end
