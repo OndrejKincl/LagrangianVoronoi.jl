@@ -14,10 +14,10 @@ const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 100 #resolution
+const N = 150 #resolution
 const dr = 1.0/N
 
-const dt = 0.1*dr/v_char
+const dt = 0.2*dr/v_char
 const t_end =  1.0
 const nframes = 100
 const c0 = 10.0  # sound speed
@@ -26,7 +26,7 @@ const gamma = 1.4
 
 const h_stab = 2.0*dr
 const P_stab = 0.05*rho0*v_char^2
-const artificial_visc = 1e-4
+const artificial_visc = dr^2
 
 const export_path = "results/gresho/N$(N)"
 
@@ -73,7 +73,7 @@ mutable struct Simulation <: SimulationWorkspace
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
-        populate_rect!(grid, ic! = ic!)
+        populate_circ!(grid, ic! = ic!)
         remesh!(grid)
         apply_unary!(grid, assign_mass!)
         return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
@@ -81,27 +81,27 @@ mutable struct Simulation <: SimulationWorkspace
 end
 
 function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-    #(xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
-    #(ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
+    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
+    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
 	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(P_stab/p.rho + P_stab/q.rho)*(p.x - q.x)
     return
 end
 
-
-
-function lloyd_stabilizer!(p::VoronoiPolygon)
-    p.x = (tau*p.x + dt*centroid(p))/(tau + dt)
-    return
+function stop_wall!(p::VoronoiPolygon)
+    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || (p.v = VEC0)
+    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || (p.v = VEC0)
+    return 
 end
 
 function step!(sim::Simulation, t::Float64)
     #apply_unary!(sim.grid, lloyd_stabilizer!)
     move!(sim.grid, dt)
     ideal_eos!(sim.grid, gamma)
-    viscous_force!(sim.grid, artificial_visc, dt) 
-    #viscous_step!(sim.grid, dt, dr, 0.001)
-    ideal_pressurefix!(sim.grid, gamma, dt)
+    #viscous_force!(sim.grid, artificial_visc, dt) 
+    #viscous_step!(sim.grid, dt, dr)
+    #ideal_pressurefix!(sim.grid, gamma, dt)
     apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    apply_unary!(sim.grid, stop_wall!) 
     find_pressure!(sim.solver)
     energy_balance!(sim.grid, dt)
     pressure_force!(sim.grid, dt, stabilize=false)
