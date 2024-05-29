@@ -58,10 +58,10 @@ include("compressible/definitions.jl")
 export GridNSc, PolygonNSc
 
 include("compressible/solver.jl")
-export CompressibleSolver, find_pressure!
+export CompressibleSolver, find_enthalpy!
 
 include("compressible/physics.jl")
-export pressure_force!, energy_balance!, ideal_eos!, ideal_pressurefix!, viscous_step!
+export pressure_force!, energy_balance!, ideal_eos!, ideal_pressurefix!, viscous_step!, ideal_pressure_recovery!, hforce!, pforce!
 
 
 end

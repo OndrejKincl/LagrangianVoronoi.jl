@@ -14,18 +14,21 @@ const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 150 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
-const dt = 0.2*dr/v_char
+const dt = 0.1*dr/v_char
 const t_end =  1.0
 const nframes = 100
 const c0 = 10.0  # sound speed
-const tau = 0.1
+
 const gamma = 1.4
+const h0 = c0^2/(gamma - 1.0)
+const P0 = rho0*c0^2/gamma
+const tau = 0.1
 
 const h_stab = 2.0*dr
-const P_stab = 0.05*rho0*v_char^2
+const P_stab = 0.01*rho0*v_char^2
 const artificial_visc = dr^2
 
 const export_path = "results/gresho/N$(N)"
@@ -42,26 +45,18 @@ end
 
 function h_exact(x::RealVector)::Float64
     return @match norm(x) begin
-        r, if r < 0.2 end => 12.5*r^2
-        r, if r < 0.4 end => 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
-        _ => -2.0 + 4*log(2)
+        r, if r < 0.2 end => h0 + 12.5*r^2
+        r, if r < 0.4 end => h0 + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
+        _ => h0 - 2.0 + 4*log(2)
     end
 end
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
     p.v = v_exact(p.x)
-    P0 = rho0*c0^2/gamma
-    h0 = c0^2/(gamma - 1.0)
-    h = h_exact(p.x) + h0
-    p.rho = rho0*abs(h/h0)^(1.0/(gamma - 1.0))
-    p.P = P0*abs(p.rho/rho0)^gamma
-    #p.P = rho0*h + P0
-    #p.rho = rho0*(p.P/P0)^(1.0/gamma)
-    p.e = 0.5*norm_squared(p.v) + p.P/((gamma - 1.0)*p.rho)
-end
-
-function assign_mass!(p::VoronoiPolygon)
+    p.h = h_exact(p.x)
+    p.rho = rho0*abs(p.h/h0)^(1.0/(gamma - 1.0))
+    p.P = P0*abs(p.h/h0)^(gamma/(gamma - 1.0))
     p.mass = p.rho*area(p)
 end
 
@@ -73,9 +68,10 @@ mutable struct Simulation <: SimulationWorkspace
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
-        populate_circ!(grid, ic! = ic!)
+        populate_circ!(grid)
+        #populate_rect!(grid)
         remesh!(grid)
-        apply_unary!(grid, assign_mass!)
+        apply_unary!(grid, ic!)
         return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
     end
 end
@@ -87,9 +83,10 @@ function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
     return
 end
 
-function stop_wall!(p::VoronoiPolygon)
-    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || (p.v = VEC0)
-    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || (p.v = VEC0)
+function getP!(p::VoronoiPolygon)
+    p.rho = rho0*abs(p.h/h0)^(1.0/(gamma - 1.0))
+    #p.P = P0*abs(p.h/h0)^(gamma/(gamma - 1.0))
+    p.P = (gamma - 1.0)/gamma*p.rho*p.h
     return 
 end
 
@@ -101,10 +98,10 @@ function step!(sim::Simulation, t::Float64)
     #viscous_step!(sim.grid, dt, dr)
     #ideal_pressurefix!(sim.grid, gamma, dt)
     apply_local!(sim.grid, SPH_stabilizer!, h_stab)
-    apply_unary!(sim.grid, stop_wall!) 
-    find_pressure!(sim.solver)
-    energy_balance!(sim.grid, dt)
-    pressure_force!(sim.grid, dt, stabilize=false)
+    find_enthalpy!(sim.solver)
+    apply_unary!(sim.grid, getP!)
+    #hforce!(sim.grid, dt)
+    pforce!(sim.grid, dt)
     return
 end
 
@@ -114,18 +111,17 @@ function postproc!(sim::Simulation, t::Float64)
     sim.E = 0.0
     for p in sim.grid.polygons
         sim.l2_err += area(p)*norm_squared(p.v - v_exact(p.x))
-        sim.E += p.mass*p.e
+        sim.E += 0.5*p.mass*norm_squared(p.v)
     end
     sim.l2_err = sqrt(sim.l2_err)
     @show sim.E
     @show sim.l2_err
 end
 
-
 function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :P, :rho, :e), csv_vars = (:E, :l2_err),
+        vtp_vars = (:v, :h, :rho), csv_vars = (:E, :l2_err),
         postproc! = postproc!,
         nframes = nframes
     )
