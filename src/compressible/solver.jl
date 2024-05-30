@@ -24,9 +24,9 @@ end
         for (q,e) in neighbors(p, A.grid)    
             lrr = lrrs[k += 1]
             j = e.label
-            y[i] += lrr*(x[i] - x[j])
+            y[i] += lrr*(x[i] - x[j])/(0.5*(p.rho + q.rho))
         end
-        y[i] = p.area*x[i]/(A.dt^2*p.c2) + y[i]
+        y[i] = p.area*x[i]/(A.dt^2*p.rho*p.c2) + y[i]
     end
     return y
 end
@@ -40,7 +40,7 @@ Base.size(A::CompressibleOperator, i::Int) = (i <= 2 ? A.n : 0)
 struct CompressibleSolver
     A::CompressibleOperator
     b::ThreadedVec{Float64}
-    h::ThreadedVec{Float64}
+    P::ThreadedVec{Float64}
     ms::CgSolver{Float64, Float64, ThreadedVec{Float64}}
     grid::GridNSc
     verbose::Bool
@@ -48,9 +48,9 @@ struct CompressibleSolver
         n = length(grid.polygons)
         A = CompressibleOperator(grid, dt)
         b = ThreadedVec{Float64}(undef, n)
-        h = ThreadedVec{Float64}(undef, n)
+        P = ThreadedVec{Float64}(undef, n)
         ms = CgSolver(A, b)
-        return new(A, b, h, ms, grid, verbose)
+        return new(A, b, P, ms, grid, verbose)
     end
 end
 
@@ -59,7 +59,7 @@ end
     polygons = solver.grid.polygons
     @batch for i in 1:A.n
         p = polygons[i]
-        solver.h[i] = p.h
+        solver.P[i] = p.P
         empty!(A.lrr[i])
         solver.b[i] = 0.0
         for (q,e) in neighbors(p, solver.grid)
@@ -70,20 +70,20 @@ end
             solver.b[i] += lrr*dot(m - z, p.v - q.v)
             solver.b[i] -= lrr*dot(p.x - q.x, 0.5*(p.v + q.v))
         end
-        solver.b[i] = p.area*p.h/(A.dt^2*p.c2) - solver.b[i]/(A.dt)
+        solver.b[i] = p.area*p.P/(A.dt^2*p.rho*p.c2) - solver.b[i]/(A.dt)
     end
 end
 
 
-function find_enthalpy!(solver::CompressibleSolver)
+function find_pressure!(solver::CompressibleSolver)
     refresh!(solver)
-    cg!(solver.ms, solver.A, solver.b, solver.h; verbose = Int(solver.verbose), atol = 1e-8, rtol = 1e-8, itmax = 1000)
+    cg!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-8, rtol = 1e-8, itmax = 1000)
     x = solution(solver.ms)
     if !solver.ms.stats.solved
         throw("solver did not converge")
     end
     polygons = solver.grid.polygons
     @batch for i in eachindex(x)
-        @inbounds polygons[i].h = x[i]
+        @inbounds polygons[i].P = x[i]
     end
 end

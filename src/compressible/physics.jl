@@ -1,7 +1,7 @@
 function ideal_eos!(grid::VoronoiGrid, gamma::Float64)
     @batch for p in grid.polygons
         p.area = area(p)
-        p.c2 = (gamma - 1.0)*p.h
+        p.c2 = gamma*p.P/p.rho
         p.rho = p.mass/p.area
     end
 end
