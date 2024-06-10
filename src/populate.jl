@@ -101,3 +101,29 @@ function populate_lloyd!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, 
 	return
 end
 
+function populate_hex!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, ic!::Function = _donothing) where T <: VoronoiPolygon
+    a = (4/3)^(1/4)*grid.dr
+    b = (3/4)^(1/4)*grid.dr
+    x1_max = grid.boundary_rect.xmax[1]
+    x2_max = grid.boundary_rect.xmax[2]
+    x1_min = grid.boundary_rect.xmin[1]
+    x2_min = grid.boundary_rect.xmin[2]
+    i_min = Int64(floor(x1_min/a)) - 1
+    j_min = Int64(floor(x2_min/b))
+    i_max = Int64(ceil(x1_max/a))
+    j_max = Int64(ceil(x2_max/b))
+	for i in i_min:i_max, j in j_min:j_max
+        x1 = (i + (j%2)/2)*a
+        x2 = j*b
+        x = RealVector(x1, x2)
+        if charfun(x) && isinside(grid.boundary_rect, x)
+            push!(grid.polygons, T(x))
+        end
+	end
+    remesh!(grid)
+    @batch for p in grid.polygons
+        ic!(p)
+    end
+	return
+end
+

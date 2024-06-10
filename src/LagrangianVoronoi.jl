@@ -34,7 +34,7 @@ export LinearExpansion, QuadraticExpansion, CubicExpansion
 export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral, point_value
 
 include("populate.jl")
-export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, get_mass!
+export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, populate_hex!, get_mass!
 
 include("utils/threadedvec.jl")
 export ThreadedVec
@@ -63,5 +63,7 @@ export CompressibleSolver, find_enthalpy!
 include("compressible/physics.jl")
 export pressure_force!, energy_balance!, ideal_eos!, ideal_pressurefix!, viscous_step!, ideal_pressure_recovery!, hforce!, pforce!
 
+include("utils/stabilizers.jl")
+export LloydStabilizer, stabilize!
 
 end

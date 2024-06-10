@@ -2,7 +2,7 @@
 
 module gresho
 
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters
+using WriteVTK, LinearAlgebra, Random, Match,  Parameters, Polyester
 using SmoothedParticles:rDwendland2
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
@@ -20,7 +20,7 @@ const dr = 1.0/N
 const dt = 0.1*dr/v_char
 const t_end =  1.0
 const nframes = 100
-const c0 = 10.0  # sound speed
+const c0 = 1.0  # sound speed
 
 const gamma = 1.4
 const h0 = c0^2/(gamma - 1.0)
@@ -29,7 +29,6 @@ const tau = 0.1
 
 const h_stab = 2.0*dr
 const P_stab = 0.01*rho0*v_char^2
-const artificial_visc = dr^2
 
 const export_path = "results/gresho/N$(N)"
 
@@ -43,20 +42,19 @@ function v_exact(x::RealVector)::RealVector
     return omega*RealVector(-x[2], x[1])
 end
 
-function h_exact(x::RealVector)::Float64
+function P_exact(x::RealVector)::Float64
     return @match norm(x) begin
-        r, if r < 0.2 end => h0 + 12.5*r^2
-        r, if r < 0.4 end => h0 + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
-        _ => h0 - 2.0 + 4*log(2)
+        r, if r < 0.2 end => P0 + 12.5*r^2
+        r, if r < 0.4 end => P0 + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
+        _ => P0 - 2.0 + 4*log(2)
     end
 end
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
     p.v = v_exact(p.x)
-    p.h = h_exact(p.x)
-    p.rho = rho0*abs(p.h/h0)^(1.0/(gamma - 1.0))
-    p.P = P0*abs(p.h/h0)^(gamma/(gamma - 1.0))
+    p.rho = rho0
+    p.P = P_exact(p.x)
     p.mass = p.rho*area(p)
 end
 
@@ -83,25 +81,21 @@ function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
     return
 end
 
-function getP!(p::VoronoiPolygon)
-    p.rho = rho0*abs(p.h/h0)^(1.0/(gamma - 1.0))
-    #p.P = P0*abs(p.h/h0)^(gamma/(gamma - 1.0))
-    p.P = (gamma - 1.0)/gamma*p.rho*p.h
-    return 
+function ideal_eos!(grid::GridNSc, gamma::Float64)
+    @batch for p in grid.polygons
+        p.area = area(p)
+        p.rho = p.mass/p.area
+        p.c2 = gamma*p.P/p.rho
+    end
 end
 
 function step!(sim::Simulation, t::Float64)
-    #apply_unary!(sim.grid, lloyd_stabilizer!)
-    move!(sim.grid, dt)
     ideal_eos!(sim.grid, gamma)
-    #viscous_force!(sim.grid, artificial_visc, dt) 
-    #viscous_step!(sim.grid, dt, dr)
-    #ideal_pressurefix!(sim.grid, gamma, dt)
-    apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    #apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    viscous_step!(sim.grid, dt, dr, gamma)
     find_pressure!(sim.solver)
-    #apply_unary!(sim.grid, getP!)
-    #hforce!(sim.grid, dt)
-    pforce!(sim.grid, dt)
+    pressure_force!(sim.grid, dt)
+    move!(sim.grid, dt)
     return
 end
 
@@ -121,7 +115,7 @@ end
 function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :h, :rho), csv_vars = (:E, :l2_err),
+        vtp_vars = (:v, :P, :rho), csv_vars = (:E, :l2_err),
         postproc! = postproc!,
         nframes = nframes
     )
@@ -139,15 +133,6 @@ function main()
     plot_midline()
 end
 
-function test(sim)
-    remesh!(sim.grid)
-    LagrangianVoronoi.refresh!(sim.solver)
-    for k in 1:100
-        LagrangianVoronoi.symm_test(sim.solver)
-        LagrangianVoronoi.posdef_test(sim.solver)
-    end
-end
-
 function plot_midline()
     csv_data = CSV.read(string(export_path, "/midline_data.csv"), DataFrame)
     plt = plot(
@@ -159,7 +144,7 @@ function plot_midline()
         color = :black,
         axisratio = 0.5,
         bottom_margin = 5mm,
-        linewidth = 2.0
+        louterinewidth = 2.0
     )
     AREPO_ref = CSV.read("../reference/AREPO.csv", DataFrame)
     plot!(

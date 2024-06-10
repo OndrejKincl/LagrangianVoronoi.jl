@@ -3,12 +3,14 @@
 @kwdef mutable struct PolygonNSc <: VoronoiPolygon
     x::RealVector        # position
     v::RealVector = VEC0 # velocity
-    s::Float64 = 0.0     # entropy
-    h::Float64 = 0.0     # enthalpy
-    P::Float64 = 0.0
+    a::RealVector = VEC0
+    e::Float64 = 0.0     # energy
+    P::Float64 = 0.0     # pressure
+    S::RealMatrix = MAT0     # viscous stress
     mass::Float64 = 0.0
     area::Float64 = 0.0
     rho::Float64 = 0.0
+    tau::Float64 = 0.0
     c2::Float64 = 0.0    # sound speed squared
     # sides of the polygon (in no particular order)
     edges::FastVector{Edge} = emptypolygon()
