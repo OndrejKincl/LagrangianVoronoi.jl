@@ -17,25 +17,24 @@ const N = 50 #resolution
 const dr = 1.0/N
 
 
-const nframes = 100
+const nframes = 50
 
 
 const gamma = 1.4
 
 const P0 = 1e-4
 const c0 = sqrt(gamma*P0/rho0)  # sound speed
-const v_char = 4.0
-const r_core = 0.2
-const E_core = 0.3
-const P_core = E_core/(pi*r_core^2)*(rho0*(gamma-1.0))
-const dt = 0.1*dr/v_char
+const r_bomb = 0.1
+const E_bomb = 0.3
+const t_bomb = sqrt(rho0/E_bomb*r_bomb^5)
+const v_char = r_bomb/t_bomb
+@show v_char
+@show t_bomb
 
-const t_end = 1.0
-const tau = 0.01
+const dt = 0.5*dr/(sqrt(6.0)*v_char)
 
+const t_end = 1.0 #1.0 - t_bomb
 
-const h_stab = 1.5*dr
-const P_stab = 0.01*P_core
 
 const export_path = "results/sedov/N$(N)"
 
@@ -43,23 +42,31 @@ const export_path = "results/sedov/N$(N)"
 function ic!(p::VoronoiPolygon)
     p.v = VEC0
     p.rho = rho0
+    p.area = area(p)
     p.P = P0
-    p.mass = p.rho*area(p)
     p.e = p.P/((gamma-1.0)*p.rho)
+    p.M = p.rho*p.area
+    p.U = p.M*p.v
+    p.E = p.M*p.e
 end
 
 function detonate_bomb!(grid::VoronoiGrid)
-    
+    A_bomb = 0.0
     for p in grid.polygons
         r = norm(p.x)
-        if r < r_core
-            p.P = P_core
-            p.e = p.P/((gamma-1.0)*p.rho)
+        if r < r_bomb
+            A_bomb += area(p)
         end
     end
-    
-    #p = argmin(p -> norm(p.x), grid.polygons)
-    #p.P = ((gamma-1.0)*E_core)/area(p)
+    P_bomb = E_bomb/A_bomb*(rho0*(gamma-1.0))
+    for p in grid.polygons
+        r = norm(p.x)
+        if r < r_bomb
+            p.P = P_bomb
+            p.e = p.P/((gamma-1.0)*p.rho)
+            p.E = p.M*p.e
+        end
+    end
 end
 
 mutable struct Simulation <: SimulationWorkspace
@@ -67,57 +74,28 @@ mutable struct Simulation <: SimulationWorkspace
     solver::CompressibleSolver
     E::Float64
     l2_err::Float64
-    ls::LloydStabilizer
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
         #populate_circ!(grid)
         populate_hex!(grid, ic! = ic!)
         detonate_bomb!(grid)
-        return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0, LloydStabilizer(grid))
+        return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
     end
 end
 
-function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
-    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
-	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(P_stab/p.rho + P_stab/q.rho)*(p.x - q.x)
-    return
-end
 
-function get_rho!(grid::GridNSc)
-    @batch for p in grid.polygons
-        p.area = area(p)
-        p.rho = p.mass/p.area
-    end
-end
 
-function ideal_eos!(grid::GridNSc, gamma::Float64)
-    @batch for p in grid.polygons
-        p.P = (gamma-1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
-        p.c2 = gamma*max(p.P,P0)/p.rho
-    end
-end
 
 function step!(sim::Simulation, t::Float64)
-    get_rho!(sim.grid)
-    #apply_local!(sim.grid, SPH_stabilizer!, h_stab)
-    viscous_step!(sim.grid, dt, dr, gamma)
-    ideal_eos!(sim.grid, gamma)
+    find_dv!(sim.grid, 0.01, dt)
+    dv_step!(sim.grid, dt)
+    viscous_step!(sim.grid, dt, dr)
+    ideal_eos!(sim.grid, gamma, P0)
     find_pressure!(sim.solver)
-    pressure_force!(sim.grid, dt, stabilize=false)
-    energy_balance!(sim.grid, dt)
-    #apply_unary!(sim.grid, lloyd_stabilizer!)
+    pressure_step!(sim.grid, dt)
     move!(sim.grid, dt)
-    stabilize!(sim.ls)
-    return
-end
-
-
-function lloyd_stabilizer!(p::VoronoiPolygon)
-    if !isboundary(p)
-        p.x = (tau*p.x + dt*centroid(p))/(tau + dt)
-    end
+    find_rho!(sim.grid)
     return
 end
 
@@ -126,15 +104,15 @@ function postproc!(sim::Simulation, t::Float64)
     sim.l2_err = 0.0
     sim.E = 0.0
     for p in sim.grid.polygons
-        sim.E += p.mass*p.e #0.5*p.mass*norm_squared(p.v) + p.mass*p.P/(p.rho*(gamma - 1.0))
+        sim.E += p.E
     end
     @show sim.E
-    end
+end
 
 function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :P, :rho), csv_vars = (:E, :l2_err),
+        vtp_vars = (:v, :P, :rho, :M, :U, :E), csv_vars = (:E, :l2_err),
         postproc! = postproc!,
         nframes = nframes
     )

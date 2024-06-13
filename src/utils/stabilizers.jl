@@ -14,7 +14,9 @@ struct LloydStabilizer{T}
 end
 
 function stabilize!(ls::LloydStabilizer)
-    for (i,p) in enumerate(ls.grid.polygons)
+    N = length(ls.grid.polygons)
+    @threads for i in 1:N
+        p = ls.grid.polygons[i]
         if isboundary(p)
             continue
         end
@@ -37,6 +39,7 @@ function stabilize!(ls::LloydStabilizer)
             ls.dx[i] = dr*(centr - p.x)/centroid_dist
         end
     end
+    #=
     for (i,p) in enumerate(ls.grid.polygons)
         for (q,e) in neighbors(p, ls.grid)
             j = e.label
@@ -44,11 +47,13 @@ function stabilize!(ls::LloydStabilizer)
             dotp = p.rho*dot(ls.dx[i], x_pq)
             dotq = q.rho*dot(ls.dx[j], x_pq)
             lrr = lr_ratio(p, q, e)/p.mass
-            ls.dv[i] = 0.5*lrr*(dotp*p.v + dotq*q.v)
-            ls.de[i] = 0.5*lrr*(dotp*p.e + dotq*q.e)
+            ls.dv[i] += 0.5*lrr*(dotp*p.v + dotq*q.v)
+            ls.de[i] += 0.5*lrr*(dotp*p.e + dotq*q.e)
         end
     end
-    for (i,p) in enumerate(ls.grid.polygons)
+    =#
+    @threads for i in 1:N
+        p = ls.grid.polygons[i]
         p.v += ls.dv[i]
         p.e += ls.de[i]
         p.x += ls.dx[i]

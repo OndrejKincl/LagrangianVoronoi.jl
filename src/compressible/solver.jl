@@ -24,7 +24,7 @@ end
         for (q,e) in neighbors(p, A.grid)    
             lrr = lrrs[k += 1]
             j = e.label
-            y[i] += lrr*(x[i] - x[j])/(0.5*(p.rho + q.rho))
+            y[i] += lrr*(x[i] - x[j])*(0.5/p.rho + 0.5/q.rho)
         end
         y[i] = p.area*x[i]/(A.dt^2*p.rho*p.c2) + y[i]
     end
@@ -41,7 +41,7 @@ struct CompressibleSolver
     A::CompressibleOperator
     b::ThreadedVec{Float64}
     P::ThreadedVec{Float64}
-    ms::CgSolver{Float64, Float64, ThreadedVec{Float64}}
+    ms::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
     grid::GridNSc
     verbose::Bool
     CompressibleSolver(grid::GridNSc, dt::Float64; verbose = false) = begin
@@ -49,7 +49,7 @@ struct CompressibleSolver
         A = CompressibleOperator(grid, dt)
         b = ThreadedVec{Float64}(undef, n)
         P = ThreadedVec{Float64}(undef, n)
-        ms = CgSolver(A, b)
+        ms = MinresSolver(A, b)
         return new(A, b, P, ms, grid, verbose)
     end
 end
@@ -77,10 +77,11 @@ end
 
 function find_pressure!(solver::CompressibleSolver)
     refresh!(solver)
-    cg!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-8, rtol = 1e-8, itmax = 1000)
+    minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
     x = solution(solver.ms)
     if !solver.ms.stats.solved
-        throw("solver did not converge")
+        @warn "solver did not converge"
+        @show solver.ms.stats.residuals
     end
     polygons = solver.grid.polygons
     @batch for i in eachindex(x)
