@@ -1,101 +1,180 @@
-function find_dv!(grid::VoronoiGrid, t_relax::Float64, dt::Float64)#dv0::Float64, dt::Float64, noise::Float64 = 0.0)
-    @batch for p in grid.polygons
-        c = centroid(p)
-        L_char = sqrt(p.area)
-        #p.dv = isboundary(p) ? VEC0 : dv0*(c - p.x)/(L_char + dt*dv0) + dv0*noise*randn(RealVector)
-        p.dv = isboundary(p) ? VEC0 : (c - p.x)/(dt + t_relax)
-    end
-end
+using SmoothedParticles:wendland2, rDwendland2
 
-function dv_step!(grid::VoronoiGrid, dt::Float64)
-    @batch for p in grid.polygons
-        for (q,e) in neighbors(p, grid)
-            lrr = lr_ratio(p, q, e)
-            m = 0.5*(e.v1 + e.v2)
-            z = 0.5*(p.x + q.x)
-            
-            #p.M -= dt*lrr*dot(m - z, p.rho*p.dv - q.rho*q.dv) 
-            p.U -= dt*lrr*(dot(m - z, p.rho*p.dv)*p.v - dot(m - z, q.rho*q.dv)*q.v)
-            p.E -= dt*lrr*dot(m - z, p.rho*p.e*p.dv - q.rho*q.e*q.dv)
-
-            pq = p.x - q.x
-            #p.M -= 0.5*dt*lrr*dot(pq, p.rho*p.dv + q.rho*q.dv)
-            p.U -= 0.5*dt*lrr*(dot(pq, p.dv)*p.v + dot(pq, q.dv)*q.v)
-            p.E -= 0.5*dt*lrr*dot(pq, p.rho*p.e*p.dv + q.rho*q.e*q.dv)
-        end
-    end
-    
-    @batch for p in grid.polygons
-        p.x += dt*p.dv
-    end
-    remesh!(grid)
-    find_rho!(grid)
-end
-
-function viscous_step!(grid::VoronoiGrid, dt::Float64, dr::Float64, nu::Float64 = 0.0; no_slip = true)
+function find_D!(grid::VoronoiGrid, no_slip = true)
     #find viscous stress
     @batch for p in grid.polygons
-        D = MAT0
+        p.D = MAT0
         for (q,e) in neighbors(p, grid)
             lrr = lr_ratio(p, q, e)
             m = 0.5*(e.v1 + e.v2)
             z = 0.5*(p.x + q.x)
-            D += lrr*outer(m - z, p.v - q.v)
-            sgn = (no_slip ? 1.0 : -1.0)
-            D -= sgn*lrr*outer(p.x - q.x, 0.5*(p.v + q.v))
+            #p.D -= lrr*(outer(p.v - q.v, m - p.x))
+            p.D += lrr*(outer(p.v - q.v, m - z) - 0.5*outer(p.v + q.v, p.x - q.x))
         end
-        D = 0.5/p.area*(D + transpose(D))
-        div = dot(D, MAT1)
-        mu = p.rho*(nu+ 0.5*dr^2*max(-div,0.0))
-        p.S = 2.0*mu*D
+        p.D = 0.5/p.area*(p.D + transpose(p.D))
     end
-    #accelerate
+end
+
+function find_mu!(grid::VoronoiGrid, dr::Float64, nu::Float64 = 0.0)
+    @batch for p in grid.polygons
+        div = dot(p.D, MAT1)
+        p.mu = p.rho*nu
+        p.mu += 0.75*dr^2*max(-div,0.0)
+    end
+end
+
+function viscous_step!(grid::VoronoiGrid, dt::Float64)
+    # accelerate
+    @batch for p in grid.polygons
+        for (q,e) in neighbors(p, grid)
+            m = 0.5*(e.v1 + e.v2)
+            lrr = lr_ratio(p,q,e)
+            p.v -= dt/p.mass*lrr*(2.0*p.mu*p.D - 2.0*q.mu*q.D)*(m - p.x)
+        end
+    end
+    # update energy
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
             m = 0.5*(e.v1 + e.v2)
             z = 0.5*(p.x + q.x)
             lrr = lr_ratio(p,q,e)
-            p.U -= dt*lrr*(p.S - q.S)*(m - p.x)
-            p.E -= dt*lrr*dot(m - z, p.S*q.v - q.S*p.v)
-            p.E -= dt*lrr*dot(p.x - q.x, 0.5*(p.S*q.v + q.S*p.v))
+            pSv = 2.0*p.mu*(p.D*p.v- 1.0/3*dot(p.D, MAT1)*p.v)
+            qSv = 2.0*q.mu*(q.D*q.v- 1.0/3*dot(q.D, MAT1)*q.v)
+            p.e -= dt/p.mass*lrr*dot(m - z, pSv - qSv)
+            p.e -= dt/p.mass*lrr*dot(p.x - q.x, 0.5*(pSv + qSv))
         end
     end
 end
 
 function ideal_eos!(grid::VoronoiGrid, gamma::Float64, Pmin::Float64 = 0.0)
     @batch for p in grid.polygons
-        p.v = p.U/p.M
-        p.e = p.E/p.M
         p.P = (gamma-1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
         p.c2 = gamma*max(p.P, Pmin)/p.rho
     end
 end
 
+function stiffened_eos!(grid::VoronoiGrid, gamma::Float64, rho0::Float64, P0::Float64)
+    @batch for p in grid.polygons
+        p.P = (gamma-1.0)*p.rho*(p.e - p.u - 0.5*norm_squared(p.v)) #+ P0*(1.0 - p.rho/rho0)
+        p.c2 = (gamma*p.P + P0)/p.rho
+    end
+end
+
+#find_pressure!
+
 function pressure_step!(grid::VoronoiGrid, dt::Float64)
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
             m = 0.5*(e.v1 + e.v2)
-            p.U += dt*lr_ratio(p,q,e)*(p.P - q.P)*(m - p.x)
+            p.v += dt/p.mass*lr_ratio(p,q,e)*(p.P - q.P)*(m - p.x)
         end
-        p.v = p.U/p.M
     end
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
             lrr = lr_ratio(p,q,e)
             m = 0.5*(e.v1 + e.v2)
             z = 0.5*(p.x + q.x)
-            p.E += dt*lrr*dot(m - z, p.P*q.v - q.P*p.v)
-            p.E += dt*lrr*dot(p.x - q.x, 0.5*(p.P*q.v + q.P*p.v))
+            p.e += dt/p.mass*lrr*dot(m - z, p.P*q.v - q.P*p.v)
+            p.e += dt/p.mass*lrr*dot(p.x - q.x, 0.5*(p.P*q.v + q.P*p.v))
         end
-        p.e = p.E/p.M
     end
+end
+
+function update_energy!(grid::VoronoiGrid, gamma::Float64)
+    @batch for p in grid.polygons
+        p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+    end
+end
+
+#=
+function lloyd_step!(grid::VoronoiGrid, dt::Float64, rate::Float64 = 20.0)
+    @batch for p in grid.polygons
+        a = rate*norm(p.D, 2)*dt
+        p.x = (p.x + a*centroid(p))/(1.0 + a)
+    end
+end
+=#
+
+
+function find_lloyd_potential!(grid::VoronoiGrid, alpha::Float64)
+    @batch for p in grid.polygons
+        if isboundary(p)
+            continue
+        end
+        p.u = 0.0
+        for e in p.edges
+            A = 0.5*abs(cross2(e.v1 - p.x, e.v2 - p.x))
+            # this triangle rule is exact for quad polys
+            p.u -=  (9*A/16)*norm_squared(-2/3*p.x + 1/3*e.v1 + 1/3*e.v2)
+            p.u += (25*A/48)*norm_squared(-2/5*p.x + 1/5*e.v1 + 1/5*e.v2)
+            p.u += (25*A/48)*norm_squared(-4/5*p.x + 3/5*e.v1 + 1/5*e.v2)
+            p.u += (25*A/48)*norm_squared(-4/5*p.x + 1/5*e.v1 + 3/5*e.v2)
+        end
+        p.u = 0.5*alpha/p.mass*p.u
+    end
+end
+
+
+function lloyd_step!(grid::VoronoiGrid, dt::Float64, alpha::Float64)
+    # update the potential
+    #find_lloyd_potential!(grid, alpha)    
+    # update the velocities
+    @batch for p in grid.polygons
+        if isboundary(p)
+            continue
+        end
+        lambda = dt*alpha
+        p.v += lambda*(centroid(p) - p.x)
+    end
+    # update the energies
+    #=
+    @batch for p in grid.polygons
+        for (q,e) in neighbors(p, grid)
+            a = e.v1
+            b = e.v2
+            m = 0.5*e.v1 + 0.5*e.v2
+            lrr = lr_ratio(p,q,e)
+            # simpson rule is exact for cubic polys
+            p.e += dt*0.5/6.0*alpha*lrr/p.mass*(norm_squared(a - q.x)*dot(a - p.x, p.v) - norm_squared(a - p.x)*dot(a - q.x, q.v))
+            p.e += dt*2.0/6.0*alpha*lrr/p.mass*(norm_squared(m - q.x)*dot(m - p.x, p.v) - norm_squared(m - p.x)*dot(m - q.x, q.v))
+            p.e += dt*0.5/6.0*alpha*lrr/p.mass*(norm_squared(b - q.x)*dot(b - p.x, p.v) - norm_squared(b - p.x)*dot(b - q.x, q.v))
+        end
+    end
+    =#
 end
 
 #move!
 
+function SPH_find_rho!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, h::Float64)
+	p.rho_SPH += q.mass*wendland2(h,r)
+    return
+end
+
+function SPH_update_v!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, P::Float64, h::Float64, dt::Float64)
+	p.v -= dt*q.mass*rDwendland2(h,r)*(P/p.rho_SPH^2 + P/q.rho_SPH^2)*(p.x - q.x)
+    return
+end
+
+function SPH_update_e!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, P::Float64, h::Float64, dt::Float64)
+	p.e -= dt*q.mass*rDwendland2(h,r)*dot(P*q.v/p.rho_SPH^2 + P*p.v/q.rho_SPH^2, p.x - q.x)
+    return
+end
+
+function SPH_stabilizer!(grid::VoronoiGrid, P::Float64, h::Float64, dt::Float64)
+    @batch for p in grid.polygons
+        p.rho_SPH = p.mass*wendland2(h,0.0)
+    end
+    apply_local!(grid, (p::VoronoiPolygon,q::VoronoiPolygon,r::Float64) -> SPH_find_rho!(p,q,r,h), h)
+    apply_local!(grid, (p::VoronoiPolygon,q::VoronoiPolygon,r::Float64) -> SPH_update_v!(p,q,r,P,h,dt), h)
+    apply_local!(grid, (p::VoronoiPolygon,q::VoronoiPolygon,r::Float64) -> SPH_update_e!(p,q,r,P,h,dt), h)
+    @batch for p in grid.polygons
+        p.u = -P/p.rho_SPH
+    end
+end
+
 function find_rho!(grid::VoronoiGrid)
     @batch for p in grid.polygons
         p.area = area(p)
-        p.rho = p.M/p.area
+        p.rho = p.mass/p.area
     end
 end

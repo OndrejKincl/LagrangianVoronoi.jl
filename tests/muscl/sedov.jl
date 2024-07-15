@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (-1.0, 1.0)
 const ylims = (-1.0, 1.0)
-const N = 50 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
 
@@ -22,13 +22,13 @@ const nframes = 100
 
 const gamma = 1.4
 
-const P0 = 1e-4
-const c0 = sqrt(gamma*P0/rho0)  # sound speed
+const p0 = 1e-6
+const c0 = sqrt(gamma*p0/rho0)  # sound speed
 const r_bomb = 0.1
 const E_bomb = 0.3
 const t_bomb = sqrt(rho0/E_bomb*r_bomb^5)
 const t_end = 1.0
-const CFL = 0.3
+const CFL = 0.1
 const t_relax = 0.1
 
 
@@ -36,12 +36,10 @@ const export_path = "results/sedov/N$(N)"
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
-    p.v = VEC0
-    p.rho = rho0
-    p.area = area(p)
-    p.mass = p.rho*p.area
-    p.P = P0
-    p.e = p.P/((gamma - 1.0)*p.rho) + 0.5*norm_squared(p.v)
+    p.P = VEC0
+    p.A = area(p)
+    p.M = rho0*p.A
+    p.E = p.A*p0/(gamma - 1.0)
 end
 
 function detonate_bomb!(grid::VoronoiGrid)
@@ -52,58 +50,33 @@ function detonate_bomb!(grid::VoronoiGrid)
             A_bomb += area(p)
         end
     end
-    P_bomb = E_bomb/A_bomb*(rho0*(gamma-1.0))
+    p_bomb = (gamma-1.0)*E_bomb/A_bomb
     for p in grid.polygons
         r = norm(p.x)
         if r < r_bomb
-            p.P = P_bomb
-            p.e = p.P/((gamma-1.0)*p.rho)
+            p.E = p.A*p_bomb/(gamma-1.0)
         end
     end
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
-    solver::CompressibleSolver
+    grid::GridMUSCL
     E::Float64
     t::Float64
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr)
+        grid = GridMUSCL(domain, dr)
         #populate_circ!(grid)
         populate_hex!(grid, ic! = ic!)
         detonate_bomb!(grid)
-        return new(grid, CompressibleSolver(grid, 0.0, verbose=0), 0.0, t_bomb)
+        return new(grid, 0.0, t_bomb)
     end
-end
-
-function find_c2!(grid::VoronoiGrid, gamma::Float64)
-    for p in grid.polygons
-        p.c2 = gamma*max(p.P, P0)/p.rho
-    end
-end
-
-function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64, dt::Float64, P_stab::Float64, h_stab::Float64)
-    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
-    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
-	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(P_stab/p.rho^2 + P_stab/q.rho^2)*(p.x - q.x)
-    return
 end
 
 function step!(sim::Simulation)
     v_shock = 0.4*sim.t^(-0.6)*(E_bomb/rho0)^0.2
     dt = CFL*dr/(sqrt(6.0)*v_shock)
-    find_D!(sim.grid)
-    find_mu!(sim.grid, dr)
-    #viscous_step!(sim.grid, dt)
-    lloyd_step!(sim.grid, dt, rho0/t_relax^2)
-    ideal_eos!(sim.grid, gamma, P0)
-    sim.solver.A.dt = dt
-    find_pressure!(sim.solver)
-    pressure_step!(sim.grid, dt)
-    apply_local!(sim.grid, (p::VoronoiPolygon,q::VoronoiPolygon,r::Float64) -> SPH_stabilizer!(p, q, r, dt, 0.01*P0, 2.0*dr), 2.0*dr)
-    move!(sim.grid, dt)
-    find_rho!(sim.grid)
+    RK2_step!(sim.grid, dt)
     sim.t += dt
     return
 end
@@ -112,7 +85,7 @@ end
 function postproc!(sim::Simulation)
     sim.E = 0.0
     for p in sim.grid.polygons
-        sim.E += p.mass*p.e
+        sim.E += p.E
     end
     @show sim.E
 end
@@ -120,14 +93,14 @@ end
 function main()
     if !ispath(export_path)
         mkpath(export_path)
-        @info "created a new path: $(path)"
+        @info "created a new path: $(export_path)"
     end 
     pvd_c = paraview_collection(joinpath(export_path, "cells.pvd"))
     pvd_p = paraview_collection(joinpath(export_path, "points.pvd"))
     nframe = 0
     sim = Simulation()
     milestones = collect(range(t_end, t_bomb, nframes))
-    vtp_vars = (:rho, :v, :P, :e)
+    vtp_vars = (:rho, :u, :e)
     while sim.t < t_end
         step!(sim)
         if sim.t > milestones[end]
@@ -158,7 +131,7 @@ end
 
 function plotdata()
     csv_data = CSV.read(string(export_path, "/linedata.csv"), DataFrame)
-    csv_ref = CSV.read("reference/sedov.csv", DataFrame)
+    csv_ref = CSV.read("../compressible/reference/sedov.csv", DataFrame)
     plt = scatter(
         csv_data.x,
         csv_data.rho,

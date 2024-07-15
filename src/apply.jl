@@ -42,7 +42,7 @@ function apply_local!(grid::VoronoiGrid, fun::Function, threshold_dist::Float64)
             for i in grid.cell_list.cells[key]
                 q = grid.polygons[i]
                 if (p.x == q.x)
-                    continue
+                   continue
                 end
                 r = norm(p.x - q.x)
                 if r < threshold_dist

@@ -1,7 +1,7 @@
 import Base: eltype, size
 import LinearAlgebra: mul!
 
-struct CompressibleOperator 
+mutable struct CompressibleOperator 
     n::Int
     grid::GridNSc
     lrr::Vector{Vector{Float64}} # pre-computed lr ratios

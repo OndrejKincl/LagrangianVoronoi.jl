@@ -42,6 +42,9 @@ export ThreadedVec
 include("utils/iterators.jl")
 export neighbors, boundaries
 
+include("utils/newtonlloyd.jl")
+export newtonlloyd!
+
 include("utils/run.jl")
 export SimulationWorkspace, run!
 
@@ -61,5 +64,18 @@ include("compressible/solver.jl")
 export CompressibleSolver, find_pressure!
 
 include("compressible/physics.jl")
-export find_dv!, dv_step!, viscous_step!, ideal_eos!, pressure_step!, find_rho!
+export find_D!, find_mu!, viscous_step!, ideal_eos!, pressure_step!, lloyd_step!, find_rho!, update_energy!, stiffened_eos!, find_lloyd_potential!, SPH_stabilizer!
+
+include("muscl/definitions.jl")
+export PolygonMUSCL, GridMUSCL
+
+include("muscl/reconstruction.jl")
+export reconstruction!, get_intensives!
+
+include("muscl/physical_step.jl")
+export ideal_gas_law, physical_step!, update!
+
+include("muscl/timestepping.jl")
+export RK2_step!
+
 end
