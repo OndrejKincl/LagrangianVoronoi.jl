@@ -34,7 +34,7 @@ function populate_rect!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, i
     M = round(Int, (x2_max - x2_min)/grid.dr)
     for x1 in range(x1_min, x1_max, N)
         for x2 in range(x2_min, x2_max, M)
-            x = RealVector(x1, x2)
+            x = RealVector(x1, x2) + 0.5*RealVector(grid.dr, grid.dr)
             if charfun(x) && isinside(grid.boundary_rect, x)
                 push!(grid.polygons, T(x))
             end

@@ -6,12 +6,22 @@ function move!(grid::VoronoiGrid, dt::Float64)
         new_x = p.x + dt*p.v
         if isinside(grid.boundary_rect, new_x)
             p.x = new_x
-        else #halt the particle
-            p.v = VEC0
+        else # try to project v to tangent space
+            for e in boundaries(p)
+                n = normal_vector(e)
+                p.v -= dot(p.v, n)*n
+            end
+            new_x = p.x + dt*p.v
+            if isinside(grid.boundary_rect, new_x)
+                p.x = new_x
+            else # give up and halt the particle
+                p.v = VEC0
+            end
         end
     end
     remesh!(grid)
 end
+
 
 function accelerate!(grid::VoronoiGrid, dt::Float64)
     @batch for p in grid.polygons
