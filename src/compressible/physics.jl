@@ -46,7 +46,7 @@ function viscous_step!(grid::VoronoiGrid, dt::Float64)
     end
 end
 
-function ideal_eos!(grid::VoronoiGrid, gamma::Float64, Pmin::Float64 = 0.0)
+function ideal_eos!(grid::VoronoiGrid, gamma::Float64, Pmin::Float64 = 1e-8)
     @batch for p in grid.polygons
         p.P = (gamma-1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
         p.c2 = gamma*max(p.P, Pmin)/p.rho

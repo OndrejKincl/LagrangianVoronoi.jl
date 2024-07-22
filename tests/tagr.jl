@@ -13,7 +13,7 @@ const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
 const t_end = 0.2
 const Res = (400, 1000, Inf)
-const Ns = [16, 24, 36, 54, 81, 121]
+const Ns = [16, 32, 48, 72, 108, 162]
 
 const l_char = 1.0
 const v_char = 1.0
@@ -57,7 +57,7 @@ mutable struct Simulation <: SimulationWorkspace
     Simulation(N::Int, Re::Number, structured::Bool) = begin
         Re = Float64(Re)
         dr = 1.0/N
-        dt = 0.05*dr
+        dt = 0.03*min(dr, dr^2*Re)
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNS(domain, dr)
         structured ? populate_rect!(grid) : populate_vogel!(grid)

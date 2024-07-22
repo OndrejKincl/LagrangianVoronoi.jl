@@ -18,19 +18,14 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.01*dr/v_char
-const t_end =  0.2
-const nframes = 200
-const c0 = 10.0  # sound speed
+const t_end =  1.0
+const nframes = 100
+const c0 = 100.0  # sound speed
 
 const gamma = 1.4
-const h0 = c0^2/(gamma - 1.0)
 const P0 = rho0*c0^2/gamma
-const alpha = 1e-3
 
 const export_path = "results/gresho/N$(N)"
-
-const h_stab = 2.4*dr
-const P_stab = 0.01*rho0*v_char^2
 
 # exact solution and initial velocity
 function v_exact(x::RealVector)::RealVector
@@ -69,12 +64,13 @@ mutable struct Simulation <: SimulationWorkspace
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
         populate_circ!(grid)
-        remesh!(grid)
+        #newtonlloyd!(grid)
         apply_unary!(grid, ic!)
         return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
     end
 end
 
+#=
 function enforce_bc!(grid::VoronoiGrid)
     @batch for p in grid.polygons
         if !(xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab)
@@ -85,19 +81,20 @@ function enforce_bc!(grid::VoronoiGrid)
         end
     end
 end
+=#
 
 function step!(sim::Simulation, t::Float64)
-    find_D!(sim.grid)
-    find_mu!(sim.grid, dr, 1e-4)
-    viscous_step!(sim.grid, dt)
-    enforce_bc!(sim.grid)
-    SPH_stabilizer!(sim.grid, P_stab, h_stab, dt)
     ideal_eos!(sim.grid, gamma)
     find_pressure!(sim.solver)
     pressure_step!(sim.grid, dt)
-    #lloyd_step!(sim.grid, dt, 20.0)
     move!(sim.grid, dt)
-    #find_rho!(sim.grid)
+    remesh!(sim.grid)
+    find_rho!(sim.grid)
+    find_D!(sim.grid)
+    find_mu!(sim.grid, dr)
+    viscous_step!(sim.grid, dt)
+    relaxation_step!(sim.grid, dt)
+    find_rho!(sim.grid)
     return
 end
 
@@ -117,7 +114,7 @@ end
 function main()
     sim = Simulation()
     @time run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :P, :rho, :e, :rho_SPH, :u), csv_vars = (:E, :l2_err),
+        vtp_vars = (:v, :P, :rho, :e, :mass, :momentum, :energy, :dv), csv_vars = (:E, :l2_err),
         postproc! = postproc!,
         nframes = nframes
     )

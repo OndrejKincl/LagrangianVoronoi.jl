@@ -59,6 +59,7 @@ end
     polygons = solver.grid.polygons
     @batch for i in 1:A.n
         p = polygons[i]
+        p.area = area(p)
         solver.P[i] = p.P
         empty!(A.lrr[i])
         solver.b[i] = 0.0

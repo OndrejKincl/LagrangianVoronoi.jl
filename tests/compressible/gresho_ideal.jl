@@ -20,7 +20,7 @@ const dr = 1.0/N
 const dt = 0.1*dr/v_char
 const t_end =  1.0
 const nframes = 100
-const c0 = 1.0  # sound speed
+const c0 = 10.0  # sound speed
 
 const gamma = 1.4
 const h0 = c0^2/(gamma - 1.0)
@@ -67,18 +67,12 @@ mutable struct Simulation <: SimulationWorkspace
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
         populate_circ!(grid)
+        newtonlloyd!(grid)
         #populate_rect!(grid)
         remesh!(grid)
         apply_unary!(grid, ic!)
         return new(grid, CompressibleSolver(grid, dt, verbose=0), 0.0, 0.0)
     end
-end
-
-function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
-    (xlims[1] + h_stab < p.x[1] < xlims[2] - h_stab) || return
-    (ylims[1] + h_stab < p.x[2] < ylims[2] - h_stab) || return
-	p.v += -dt*q.mass*rDwendland2(h_stab,r)*(P_stab/p.rho + P_stab/q.rho)*(p.x - q.x)
-    return
 end
 
 function ideal_eos!(grid::GridNSc, gamma::Float64)
@@ -91,8 +85,8 @@ end
 
 function step!(sim::Simulation, t::Float64)
     ideal_eos!(sim.grid, gamma)
-    #apply_local!(sim.grid, SPH_stabilizer!, h_stab)
-    viscous_step!(sim.grid, dt, dr, gamma)
+    find_D!(grid)
+    #viscous_step!(sim.grid, dt, dr, gamma)
     find_pressure!(sim.solver)
     pressure_force!(sim.grid, dt)
     move!(sim.grid, dt)

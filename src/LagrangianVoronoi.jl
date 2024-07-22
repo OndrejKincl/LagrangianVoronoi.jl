@@ -64,7 +64,10 @@ include("compressible/solver.jl")
 export CompressibleSolver, find_pressure!
 
 include("compressible/physics.jl")
-export find_D!, find_mu!, viscous_step!, ideal_eos!, pressure_step!, lloyd_step!, find_rho!, update_energy!, stiffened_eos!, find_lloyd_potential!, SPH_stabilizer!
+export find_D!, find_mu!, viscous_step!, ideal_eos!, pressure_step!, find_rho!, update_energy!, stiffened_eos!
+
+include("compressible/relaxation.jl")
+export relaxation_step!
 
 include("muscl/definitions.jl")
 export PolygonMUSCL, GridMUSCL
