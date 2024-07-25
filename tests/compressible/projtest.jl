@@ -1,11 +1,11 @@
 module projtest
 include("../../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi, LinearAlgebra, WriteVTK
+using .LagrangianVoronoi, LinearAlgebra, WriteVTK, Random
 
 const P0 = 3.0
 const dr = 0.01
 const dt = 0.1
-const c2 = 1.0
+const c2 = 100.0
 const L = 1.0
 const V0 = 1.0
 const rho0 = 2.0
@@ -31,9 +31,10 @@ end
 function main()
     dom = Rectangle(VEC0, L*VECX + L*VECY)
     grid = GridNSc(dom, dr)
-    #populate_lloyd!(grid; ic! = ic!, niterations = 10)
+    Random.seed!(123)
+    populate_lloyd!(grid; ic! = ic!, niterations = 10)
     #populate_hex!(grid; ic! = ic!)
-    populate_rect!(grid; ic! = ic!)
+    #populate_rect!(grid; ic! = ic!)
     solver = CompressibleSolver(grid)
     find_pressure!(solver, dt)
     err = 0.0
