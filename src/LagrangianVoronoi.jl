@@ -48,26 +48,23 @@ export newtonlloyd!
 include("utils/run.jl")
 export SimulationWorkspace, run!
 
+include("utils/lrrcache.jl")
+export Lrr_cache, new_lrr_cache, refresh!
+
 include("NavierStokes/definitions.jl")
 export GridNS, PolygonNS
 
 include("NavierStokes/physics.jl")
 export move!, pressure_force!, viscous_force!
 
-include("NavierStokes/pressuresolver.jl")
+include("NavierStokes/psolver.jl")
 export PressureSolver, find_pressure!
 
 include("compressible/definitions.jl")
 export GridNSc, PolygonNSc
 
-include("compressible/solver.jl")
-export CompressibleSolver, find_pressure!
-
-include("compressible/physics.jl")
-export find_D!, find_mu!, viscous_step!, ideal_eos!, pressure_step!, find_rho!, update_energy!, stiffened_eos!
-
-include("compressible/relaxation.jl")
-export relaxation_step!
+include("compressible/psolver.jl")
+export CompressibleOperator, CompressibleSolver, find_pressure!
 
 include("muscl/definitions.jl")
 export PolygonMUSCL, GridMUSCL
@@ -80,5 +77,6 @@ export ideal_gas_law, physical_step!, update!
 
 include("muscl/timestepping.jl")
 export RK2_step!
+
 
 end
