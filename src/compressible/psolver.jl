@@ -18,7 +18,7 @@ function refresh!(A::CompressibleOperator, grid::VoronoiGrid, dt::Float64)
             p = grid.polygons[i]
             empty!(A.neighbors[i])
             empty!(A.lr_ratios[i])
-            A.diagonal[i] = p.area/(p.rho*p.c2*dt^2)
+            A.diagonal[i] = p.mass/(p.rho^2*p.c2*dt^2)
             for (q,e) in neighbors(p, grid)
                 push!(A.neighbors[i], e.label)
                 push!(A.lr_ratios[i], lr_ratio(p,q,e)*(0.5/p.rho + 0.5/q.rho))
@@ -28,14 +28,11 @@ function refresh!(A::CompressibleOperator, grid::VoronoiGrid, dt::Float64)
 end
 
 function mul!(y::ThreadedVec{Float64}, A::CompressibleOperator, x::ThreadedVec{Float64})::ThreadedVec{Float64}
-    # use the pressure gradient to find y
     @batch for i in 1:A.n
-        begin
+        @inbounds begin
             y[i] = A.diagonal[i]*x[i]
             for (k,j) in enumerate(A.neighbors[i])
                 lrr = A.lr_ratios[i][k]
-                #y[i] -= lrr*(dot(A.Gy[i] - A.Gy[j], m - z) - (0.5/p.rho + 0.5/q.rho)*(x[i] - x[j]))
-                #y[i] -= lrr*(dot(A.Gy[i] - A.Gy[j], m - z) - 0.5*dot(A.Gy[i] + A.Gy[j], p.x - q.x))
                 y[i] += lrr*(x[i] - x[j])
             end
         end
@@ -67,7 +64,7 @@ struct CompressibleSolver{T}
     end
 end
 
-function refresh!(solver::CompressibleSolver, dt::Float64)
+function refresh!(solver::CompressibleSolver, dt::Float64, gp_step::Bool)
     grid = solver.grid
     b = solver.b
     P = solver.P
@@ -75,7 +72,7 @@ function refresh!(solver::CompressibleSolver, dt::Float64)
     @batch for i in eachindex(grid.polygons)
         @inbounds begin
             p = grid.polygons[i]
-            b[i] = p.area*p.P/(p.rho*p.c2*dt^2)
+            b[i] = p.mass*p.P/(p.rho^2*p.c2*dt^2)
             P[i] = p.P # serves as an initial guess
             GP[i] = VEC0
             for (q,e) in neighbors(p, grid)
@@ -83,33 +80,36 @@ function refresh!(solver::CompressibleSolver, dt::Float64)
                 m = 0.5*(e.v1 + e.v2)
                 z = 0.5*(p.x + q.x)
                 b[i] -= (lrr/dt)*(dot(p.v - q.v, m - z) - 0.5*dot(p.v + q.v, p.x - q.x))
-                GP[i] -= (lrr/dt)*(p.P - q.P)*(m - p.x)
+                GP[i] -= lrr*(p.P - q.P)*(m - p.x)
             end
             GP[i] /= p.mass
         end
     end
     # explicit part of the pressure laplacian
-    @batch for i in eachindex(grid.polygons)
-        @inbounds begin
-            p = grid.polygons[i]
-            for (q,e) in neighbors(p, grid)
-                lrr = lr_ratio(p,q,e)
-                m = 0.5*(e.v1 + e.v2)
-                z = 0.5*(p.x + q.x)
-                j = e.label
-                b[i] += lrr*dot(GP[i] - GP[j], m - z)
+    if gp_step
+        @batch for i in eachindex(grid.polygons)
+            @inbounds begin
+                p = grid.polygons[i]
+                for (q,e) in neighbors(p, grid)
+                    lrr = lr_ratio(p,q,e)
+                    m = 0.5*(e.v1 + e.v2)
+                    z = 0.5*(p.x + q.x)
+                    j = e.label
+                    b[i] += lrr*dot(GP[i] - GP[j], m - z)
+                end
             end
         end
     end
-    refresh!(solver.A, grid, dt)
 end
 
-function find_pressure!(solver::CompressibleSolver, dt::Float64)
-    refresh!(solver, dt)
-    minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
-    x = solution(solver.ms)
-    polygons = solver.grid.polygons
-    @batch for i in eachindex(x)
-        @inbounds polygons[i].P = x[i]
+function find_pressure!(solver::CompressibleSolver, dt::Float64, niter = 5)
+    refresh!(solver.A, solver.grid, dt)
+    for it in 1:niter
+        refresh!(solver, dt, (it > 0))
+        minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
+        x = solution(solver.ms)
+        @batch for i in eachindex(x)
+            @inbounds solver.grid.polygons[i].P = x[i]
+        end
     end
 end

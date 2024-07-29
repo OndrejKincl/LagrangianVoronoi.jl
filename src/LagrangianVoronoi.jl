@@ -10,7 +10,7 @@ using DataFrames
 using Krylov
 
 include("geometry.jl")
-export RealVector, RealMatrix, VEC0, VECX, VECY, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts
+export RealVector, RealMatrix, VEC0, VECX, VECY, MAT0, MAT1, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts
 
 include("utils/fastvector.jl")
 export FastVector
@@ -66,6 +66,16 @@ export GridNSc, PolygonNSc
 include("compressible/psolver.jl")
 export CompressibleOperator, CompressibleSolver, find_pressure!
 
+include("compressible/pressure.jl")
+export pressure_step!, ideal_eos!
+
+include("compressible/diffusion.jl")
+export find_D!, viscous_step!
+
+
+include("compressible/relaxation.jl")
+export relaxation_step!
+
 include("muscl/definitions.jl")
 export PolygonMUSCL, GridMUSCL
 
@@ -77,6 +87,7 @@ export ideal_gas_law, physical_step!, update!
 
 include("muscl/timestepping.jl")
 export RK2_step!
+
 
 
 end

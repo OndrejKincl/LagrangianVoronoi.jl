@@ -7,13 +7,12 @@ const dr = 0.01
 const dt = 0.1
 const c2 = 100.0
 const L = 1.0
-const V0 = 1.0
+const V0 = 1.5
 const rho0 = 2.0
 const A = 4pi*V0*L*rho0*dt/(L^2/c2 + (2pi*dt)^2)
 
 function ic!(p::VoronoiPolygon)
     p.rho = rho0
-    p.area = area(p)
     p.mass = area(p)*p.rho
     p.c2 = c2
     p.P = P0

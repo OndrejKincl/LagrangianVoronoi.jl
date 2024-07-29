@@ -4,8 +4,7 @@ using .LagrangianVoronoi, LinearAlgebra, Random
 
 function ic!(p::VoronoiPolygon)
     p.rho = 1.0 #+ rand()
-    p.area = area(p)
-    p.mass = p.area*p.rho
+    p.mass = area(p)*p.rho
     p.c2 = 1.0 #+ randn()
 end
 
@@ -16,7 +15,8 @@ function main()
     grid = GridNSc(dom, dr)
     #populate_lloyd!(grid; ic! = ic!, niterations = 1)
     populate_hex!(grid; ic! = ic!)
-    op = CompressibleOperator(grid, dt)
+    op = CompressibleOperator(grid)
+    refresh!(op, grid, dt)
     for i in 1:10
         @info "test no $i"
         test_symmetry(op)
