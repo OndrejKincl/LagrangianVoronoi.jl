@@ -102,10 +102,10 @@ function refresh!(solver::CompressibleSolver, dt::Float64, gp_step::Bool)
     end
 end
 
-function find_pressure!(solver::CompressibleSolver, dt::Float64, niter = 5)
+function find_pressure!(solver::CompressibleSolver, dt::Float64, niter::Int64 = 5)
     refresh!(solver.A, solver.grid, dt)
     for it in 1:niter
-        refresh!(solver, dt, (it > 0))
+        refresh!(solver, dt, (it > 1))
         minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
         x = solution(solver.ms)
         @batch for i in eachindex(x)

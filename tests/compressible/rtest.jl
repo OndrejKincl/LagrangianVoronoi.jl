@@ -70,6 +70,7 @@ end
 function step!(sim::Simulation, t::Float64)
     if (t > 0.0)
         relaxation_step!(sim.grid, dt)
+        remesh!(sim.grid)
     end
     ideal_eos!(sim.grid, gamma)
     return
@@ -114,7 +115,7 @@ end
 function main()
     sim = Simulation()
     run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :rho, :e, :P, :mass, :dv),
+        vtp_vars = (:v, :rho, :e, :P, :mass, :dv, :phi_rho),
         postproc! = postproc!,
         nframes = nframes
     )

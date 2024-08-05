@@ -67,7 +67,7 @@ include("compressible/psolver.jl")
 export CompressibleOperator, CompressibleSolver, find_pressure!
 
 include("compressible/pressure.jl")
-export pressure_step!, ideal_eos!
+export pressure_step!, ideal_eos!, stiffened_eos!
 
 include("compressible/diffusion.jl")
 export find_D!, viscous_step!

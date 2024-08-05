@@ -21,6 +21,8 @@
 
     # limiter parameters
     phi_rho::Float64 = 0.0
+    phi_e::Float64 = 0.0
+    phi_v::RealVector = VEC0
 
     # sides of the polygon (in no particular order)
     edges::FastVector{Edge} = emptypolygon()

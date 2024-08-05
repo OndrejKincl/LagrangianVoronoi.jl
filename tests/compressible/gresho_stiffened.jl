@@ -20,7 +20,7 @@ const dt = 0.1*dr/v_char
 const t_end =  1.0
 const nframes = 100
 
-const c0 = 0.01
+const c0 = 1000.0
 const gamma = 1.4
 const P0 = rho0*c0^2/gamma
 
@@ -38,9 +38,9 @@ end
 
 function P_exact(x::RealVector)::Float64
     return @match norm(x) begin
-        r, if r < 0.2 end => P0 + 12.5*r^2
-        r, if r < 0.4 end => P0 + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
-        _ => P0 - 2.0 + 4*log(2)
+        r, if r < 0.2 end => 12.5*r^2
+        r, if r < 0.4 end => 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
+        _ => -2.0 + 4*log(2)
     end
 end
 
@@ -68,7 +68,7 @@ end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
-    ideal_eos!(sim.grid, gamma)
+    stiffened_eos!(sim.grid, gamma, P0)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
@@ -136,41 +136,6 @@ function plot_midline()
         linewidth = 2.0
     )
     savefig(plt, string(export_path, "/midline_plot.pdf"))
-end
-
-function plot_midline_all_Mach()
-    Ma0001 = CSV.read(string("results/gresho/Ma0.001/midline_data.csv"), DataFrame)
-    Ma001 = CSV.read(string("results/gresho/Ma0.01/midline_data.csv"), DataFrame)
-    Ma01 = CSV.read(string("results/gresho/Ma0.1/midline_data.csv"), DataFrame)
-    Ma1 = CSV.read(string("results/gresho/Ma1.0/midline_data.csv"), DataFrame)
-    Ma10 = CSV.read(string("results/gresho/Ma10.0/midline_data.csv"), DataFrame)
-    Ma100 = CSV.read(string("results/gresho/Ma100.0/midline_data.csv"), DataFrame)
-    plt = plot(
-        xlabel = L"x",
-        ylabel = L"\Delta v_y",
-        bottom_margin = 5mm,
-    )
-    #=
-    plot!(plt,
-        Ma1.x,
-        Ma1.vy_exact,
-        label = "exact solution",
-        color = :black,
-        linewidth = 1.0,
-        #size = (400, 1000)
-    )
-    =#
-    plot_y = [Ma0001.vy Ma001.vy Ma01.vy Ma1.vy Ma10.vy Ma100.vy]
-    plot_y = (plot_y .- Ma1.vy_exact)
-    plot!(plt,
-        Ma1.x,
-        plot_y,
-        label = ["Ma = 0.001 (stiffened)" "Ma = 0.01" "Ma = 0.1" "Ma = 1.0" "Ma = 10" "Ma = 100"],
-        markershape = :hex,
-        markersize = 2,
-        linewidth = 1.0
-    )
-    savefig(plt, string("results/gresho/midline_plot_all_Mach.pdf"))
 end
 
 

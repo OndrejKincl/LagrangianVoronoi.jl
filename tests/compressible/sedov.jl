@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (-1.0, 1.0)
 const ylims = (-1.0, 1.0)
-const N = 50 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
 
@@ -22,13 +22,13 @@ const nframes = 100
 
 const gamma = 1.4
 
-const P0 = 1e-6
+const P0 = 1e-8
 const c0 = sqrt(gamma*P0/rho0)  # sound speed
-const r_bomb = 0.1
+const r_bomb = 0.05
 const E_bomb = 0.3
 const t_bomb = sqrt(rho0/E_bomb*r_bomb^5)
 const t_end = 1.0
-const CFL = 0.03
+const CFL = 0.1
 
 
 const export_path = "results/sedov/N$(N)"
@@ -82,12 +82,12 @@ function step!(sim::Simulation)
     v_shock = 0.4*sim.t^(-0.6)*(E_bomb/rho0)^0.2
     dt = CFL*dr/(sqrt(6.0)*v_shock)
     move!(sim.grid, dt)
-    ideal_eos!(sim.grid, gamma, Pmin = P0/10.0)
+    ideal_eos!(sim.grid, gamma, Pmin = P0)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.grid, dt, 20.0)
+    relaxation_step!(sim.grid, dt, 10.0)
     sim.t += dt
     return
 end
@@ -151,7 +151,7 @@ end
 
 function plotdata()
     csv_data = CSV.read(string(export_path, "/linedata.csv"), DataFrame)
-    csv_ref = CSV.read("../compressible/reference/sedov.csv", DataFrame)
+    csv_ref = CSV.read("reference/sedov.csv", DataFrame)
     plt = scatter(
         csv_data.x,
         csv_data.rho,

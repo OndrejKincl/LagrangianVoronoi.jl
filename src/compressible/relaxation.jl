@@ -1,32 +1,31 @@
-function relaxation_step!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 20.0)
+function relaxation_step!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 20.0; rusanov::Bool = true)
     @batch for p in grid.polygons
         p.momentum = p.mass*p.v
         p.energy = p.mass*p.e
         lambda = alpha*norm(p.D)
         p.dv = lambda/(1.0 + dt*lambda)*(centroid(p) - p.x)
-        drho = VEC0
-        rho_min = p.rho
-        rho_max = p.rho
-        for (q,e) in neighbors(p,grid)
-            m = 0.5*(e.v1 + e.v2)
-            drho += -lr_ratio(p,q,e)*dot(m - p.x, p.dv)*(p.rho - q.rho)
-            rho_min = min(q.rho, rho_min)
-            rho_max = max(q.rho, rho_max)
-        end
-        drho *= dt*p.rho/p.mass
-        p.phi_rho = 1.0
-        (drho > 0.0) && p.phi_rho = min(p.phi_rho, (rho_max - p.rho)/drho)
-        (drho < 0.0) && p.phi_rho = min(p.phi_rho, (rho_min - p.rho)/drho)
     end
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
             lrr = lr_ratio(p,q,e)
-            m = 0.5*(e.v1 + e.v2)
-            dot_p = dot(m - p.x, p.dv)
-            dot_q = dot(m - q.x, q.dv)
-            p.mass += min(p.phi_rho, q.phi_rho)*dt*lrr*(dot_p*q.rho - dot_q*p.rho)
-            p.momentum += dt*lrr*(dot_p*(q.rho*q.v) - dot_q*(p.rho*p.v)) 
-            p.energy += dt*lrr*(dot_p*(q.rho*q.e) - dot_q*(p.rho*p.e))
+            mz = 0.5*(e.v1 + e.v2) - 0.5*(p.x + q.x)
+            pq = p.x - q.x
+            pdvpq = dot(p.dv, pq)
+            qdvpq = dot(q.dv, pq)
+            pdvmz = dot(p.dv, mz)
+            qdvmz = dot(q.dv, mz)
+            p.mass += dt*lrr*((pdvmz*p.rho - qdvmz*q.rho) - 0.5*(pdvpq*p.rho + qdvpq*q.rho))
+            p.momentum += dt*lrr*((pdvmz*p.rho*p.v - qdvmz*q.rho*q.v) - 0.5*(pdvpq*p.rho*p.v + qdvpq*q.rho*q.v))
+            p.energy += dt*lrr*((pdvmz*p.rho*p.e - qdvmz*q.rho*q.e) - 0.5*(pdvpq*p.rho*p.e + qdvpq*q.rho*q.e))
+
+            if rusanov
+                # Rusanov-like term helps with entropy
+                a = max(norm(p.dv), norm(q.dv))
+                l = len(e)
+                p.mass += 0.5*dt*l*a*(q.rho - p.rho)
+                p.momentum += 0.5*dt*l*a*(q.rho*q.v - p.rho*p.v)
+                p.energy += 0.5*dt*l*a*(q.rho*q.e - p.rho*p.e)
+            end
         end
     end
     @batch for p in grid.polygons
@@ -36,4 +35,3 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 20.0)
     end
     #remesh!(grid)
 end
-
