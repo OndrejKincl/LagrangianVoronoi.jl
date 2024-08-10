@@ -7,6 +7,9 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 20.0;
     end
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
+            if !(p.phase == q.phase)
+                continue
+            end
             lrr = lr_ratio(p,q,e)
             mz = 0.5*(e.v1 + e.v2) - 0.5*(p.x + q.x)
             pq = p.x - q.x

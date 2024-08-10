@@ -17,10 +17,11 @@ function pressure_step!(grid::VoronoiGrid, dt::Float64)
     end
 end
 
-function ideal_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4; Pmin = 1e-6)
+function ideal_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4, Pmin = 1e-6)
     @batch for p in grid.polygons
         p.rho = p.mass/area(p)
-        p.P = (gamma - 1.0)*p.rho*(p.e - 0.5*norm_squared(p.v))
+        eps = p.e - 0.5*norm_squared(p.v)
+        p.P = (gamma - 1.0)*p.rho*eps
         p.c2 = gamma*max(p.P, Pmin)/p.rho
     end
 end
@@ -31,5 +32,12 @@ function stiffened_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4, P0::Float64 = 0
         eps = p.e - 0.5*norm_squared(p.v)
         p.P = (gamma - 1.0)*p.rho*eps
         p.c2 = gamma*(p.P + P0)/p.rho
+    end
+end
+
+function gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
+    @batch for p in grid.polygons
+        p.v += dt*g
+        p.e += dot(dt*g, p.v)
     end
 end

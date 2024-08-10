@@ -3,6 +3,11 @@ include("geometry.jl")
 const POLYGON_SIZEHINT = 10
 const SIGNUM_EPS = 2*eps(Float64)
 
+const BDARY_UP = -1
+const BDARY_RIGHT = -2
+const BDARY_DOWN = -3
+const BDARY_LEFT = -4
+
 @inline function signum(x::Float64)::Int
     if (x < -SIGNUM_EPS)
         return -1
@@ -28,10 +33,10 @@ emptypolygon() = FastVector{Edge}(POLYGON_SIZEHINT)
     C = boundary_rect.xmax
     B = RealVector(C[1], A[2])
     D = RealVector(A[1], C[2])
-    push!(p.edges, Edge(B, A))
-    push!(p.edges, Edge(A, D))
-    push!(p.edges, Edge(D, C))
-    push!(p.edges, Edge(C, B))
+    push!(p.edges, Edge(B, A, label=BDARY_DOWN))
+    push!(p.edges, Edge(A, D, label=BDARY_LEFT))
+    push!(p.edges, Edge(D, C, label=BDARY_UP))
+    push!(p.edges, Edge(C, B, label=BDARY_RIGHT))
 end
 
 

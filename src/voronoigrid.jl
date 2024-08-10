@@ -3,22 +3,34 @@ mutable struct VoronoiGrid{T}
     h::Float64
     rr_max::Float64
     boundary_rect::Rectangle
+    extended_rect::Rectangle
     cell_list::CellList
     polygons::Vector{T}
     index_containers::Vector{Vector{Int}}
-    VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64) where T = begin
-        h = 2*dr
-        cell_list = CellList(h, boundary_rect)
+    xperiod::Bool
+    yperiod::Bool
+    VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64;
+    xperiod::Bool = false, yperiod::Bool = false) where T = begin
+        h = 2dr
+        r_max = 10dr
+        extended_xmin = boundary_rect.xmin - r_max*xperiod*VECX - r_max*yperiod*VECY
+        extended_xmax = boundary_rect.xmax + r_max*xperiod*VECX + r_max*yperiod*VECY
+        extended_rect = Rectangle(extended_xmin, extended_xmax)
+        cell_list = CellList(h, extended_rect)
         polygons = T[]
         index_containers = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
+        
         return new{T}(
             dr,
             h,
             100*dr^2,
             boundary_rect, 
+            extended_rect,
             cell_list, 
             polygons, 
-            index_containers
+            index_containers,
+            xperiod,
+            yperiod
         )
     end
 end

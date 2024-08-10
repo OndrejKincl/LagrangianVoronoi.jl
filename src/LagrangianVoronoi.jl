@@ -17,6 +17,7 @@ export FastVector
 
 include("polygon.jl")
 export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio, POLYGON_SIZEHINT, PreAllocVector
+export BDARY_UP, BDARY_RIGHT, BDARY_DOWN, BDARY_LEFT, emptypolygon
 
 include("cell_list.jl")
 
@@ -61,20 +62,22 @@ include("NavierStokes/psolver.jl")
 export PressureSolver, find_pressure!
 
 include("compressible/definitions.jl")
-export GridNSc, PolygonNSc
+export GridNSc, PolygonNSc, GridNSFc, PolygonNSFc
 
 include("compressible/psolver.jl")
 export CompressibleOperator, CompressibleSolver, find_pressure!
 
 include("compressible/pressure.jl")
-export pressure_step!, ideal_eos!, stiffened_eos!
+export pressure_step!, ideal_eos!, stiffened_eos!, gravity_step!
 
 include("compressible/diffusion.jl")
 export find_D!, viscous_step!
 
-
 include("compressible/relaxation.jl")
 export relaxation_step!
+
+include("compressible/fourier.jl")
+export ideal_temperature!, fourier_step!, fourier_dirichlet_bc!
 
 include("muscl/definitions.jl")
 export PolygonMUSCL, GridMUSCL
@@ -87,6 +90,7 @@ export ideal_gas_law, physical_step!, update!
 
 include("muscl/timestepping.jl")
 export RK2_step!
+
 
 
 
