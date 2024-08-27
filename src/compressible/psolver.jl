@@ -20,8 +20,9 @@ function refresh!(A::CompressibleOperator, grid::VoronoiGrid, dt::Float64)
             empty!(A.lr_ratios[i])
             A.diagonal[i] = p.mass/(p.rho^2*p.c2*dt^2)
             for (q,e) in neighbors(p, grid)
+                pq = get_arrow(p.x, q.x, grid)
                 push!(A.neighbors[i], e.label)
-                push!(A.lr_ratios[i], lr_ratio(p,q,e)*(0.5/p.rho + 0.5/q.rho))
+                push!(A.lr_ratios[i], lr_ratio(pq,e)*(0.5/p.rho + 0.5/q.rho))
             end
         end
     end
@@ -76,10 +77,11 @@ function refresh!(solver::CompressibleSolver, dt::Float64, gp_step::Bool)
             P[i] = p.P # serves as an initial guess
             GP[i] = VEC0
             for (q,e) in neighbors(p, grid)
-                lrr = lr_ratio(p,q,e)
+                pq = get_arrow(p.x,q.x,grid)
+                lrr = lr_ratio(pq,e)
                 m = 0.5*(e.v1 + e.v2)
-                z = 0.5*(p.x + q.x)
-                b[i] -= (lrr/dt)*(dot(p.v - q.v, m - z) - 0.5*dot(p.v + q.v, p.x - q.x))
+                mz = 0.5*get_arrow(m, p.x, grid) + 0.5*get_arrow(m, q.x, grid)
+                b[i] -= (lrr/dt)*(dot(p.v - q.v, mz) - 0.5*dot(p.v + q.v, pq))
                 GP[i] -= lrr*(p.P - q.P)*(m - p.x)
             end
             GP[i] /= p.mass
@@ -91,11 +93,12 @@ function refresh!(solver::CompressibleSolver, dt::Float64, gp_step::Bool)
             @inbounds begin
                 p = grid.polygons[i]
                 for (q,e) in neighbors(p, grid)
-                    lrr = lr_ratio(p,q,e)
+                    pq = get_arrow(p.x,q.x,grid)
+                    lrr = lr_ratio(pq,e)
                     m = 0.5*(e.v1 + e.v2)
-                    z = 0.5*(p.x + q.x)
+                    mz = 0.5*get_arrow(m, p.x, grid) + 0.5*get_arrow(m, q.x, grid)
                     j = e.label
-                    b[i] += lrr*dot(GP[i] - GP[j], m - z)
+                    b[i] += lrr*dot(GP[i] - GP[j], mz)
                 end
             end
         end

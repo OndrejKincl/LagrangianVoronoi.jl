@@ -17,10 +17,10 @@ const N = 200 #resolution
 const dr = 1.0/N
 
 const dt = 0.1*dr/v_char
-const t_end =  1.0
+const t_end =  3.0
 const nframes = 100
 
-const c0 = 1000.0
+const c0 = 100.0
 const gamma = 1.4
 const P0 = rho0*c0^2/gamma
 

@@ -39,7 +39,6 @@ emptypolygon() = FastVector{Edge}(POLYGON_SIZEHINT)
     push!(p.edges, Edge(C, B, label=BDARY_RIGHT))
 end
 
-
 # Intersects a VoronoiPolygon with the halfplane of all points closer to y than to p.x.
 # Use label for newly created edge. This code has very sharp edges, modify with caution.
 @inbounds function voronoicut!(p::VoronoiPolygon, y::RealVector, label::Int)::Bool

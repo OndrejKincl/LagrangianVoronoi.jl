@@ -2,17 +2,21 @@ function pressure_step!(grid::VoronoiGrid, dt::Float64)
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
             m = 0.5*(e.v1 + e.v2)
-            p.v += dt*lr_ratio(p,q,e)/p.mass*(p.P - q.P)*(m - p.x)
+            pq = get_arrow(p.x, q.x, grid)
+            p.v += dt*lr_ratio(pq,e)/p.mass*(p.P - q.P)*(m - p.x)
         end
     end
     @batch for p in grid.polygons
         for (q,e) in neighbors(p, grid)
-            lrr = lr_ratio(p,q,e)
+            pq = get_arrow(p.x, q.x, grid)
+            lrr = lr_ratio(pq,e)
             m = 0.5*(e.v1 + e.v2)
+            mp = get_arrow(m, p.x, grid)
+            mq = get_arrow(m, q.x, grid)
             #z = 0.5*(p.x + q.x)
             #p.e += 0.5*dt*lrr/p.mass*dot(p.x - q.x, p.P*q.v + q.P*p.v)
             #p.e -= dt*lrr/p.mass*dot(m - z, p.P*q.v - q.P*p.v)
-            p.e -= dt*lrr/p.mass*(dot(m - p.x, q.P*p.v) - dot(m - q.x, p.P*q.v))
+            p.e -= dt*lrr/p.mass*(dot(mp, q.P*p.v) - dot(mq, p.P*q.v))
         end
     end
 end

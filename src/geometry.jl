@@ -39,6 +39,10 @@ Rectangle(; xlims::Tuple{Number, Number}, ylims::Tuple{Number, Number}) = begin
     return Rectangle(xmin, xmax)
 end
 
+function area(r::Rectangle)::Float64
+    return abs(r.xmax[1] - r.xmin[1])*abs(r.xmax[2] - r.xmin[2])
+end
+
 function isinside(r::Rectangle, x::RealVector)::Bool
     return (r.xmin[1] <= x[1] <= r.xmax[1]) && (r.xmin[2] <= x[2] <= r.xmax[2])
 end

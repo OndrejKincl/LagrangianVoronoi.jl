@@ -11,7 +11,7 @@ const W = 0.1
 const gamma = 1.4 #adiabatic index
 const rho0 = 10.0
 
-const cV = 1.0  #sp. heat capacity  
+const cV = 10.0  #sp. heat capacity  
 const R = (gamma - 1.0)*cV
 const thermal_k = mu*cV*gamma/0.71 #thermal conductivity
 
@@ -21,11 +21,11 @@ const Tu = P0/(rho0*R) #temperature of upper boundary (cooler)
 const Td = 1000.0 #30.0 #Tu*(1.0 + contrast) #temperature of lower boundary (heater)
 
 const export_path = "results/rabe2"
-const dr = H/100
-const v_char = 10.0
+const dr = H/150
+const v_char = 2.0
 const dt = 0.1*dr/v_char
-const nframes = 200
-const t_end = 1.0
+const nframes = 400
+const t_end = 2.0
 
 function print_info()
     @show Tu
@@ -125,13 +125,15 @@ mutable struct Simulation <: SimulationWorkspace
     E::Float64
     S::Float64
     E_kinetic::Float64
+    rx::Relaxator{PolygonNSFc}
     Simulation() = begin
         xlims = (0.0, W)
         ylims = (0.0, H)
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSFc(domain, dr)
         populate_lloyd!(grid, ic! = exp_atmo!)
-        return new(grid, CompressibleSolver(grid), 0.0, 0.0)
+        rx = Relaxator(grid)
+        return new(grid, CompressibleSolver(grid), 0.0, 0.0, 0.0, rx)
     end
 end
 
@@ -146,7 +148,7 @@ function step!(sim::Simulation, t::Float64)
     enforce_bc!(sim.grid, dt, T_bc)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.grid, dt)
+    relaxation_step!(sim.rx, dt)
     return
 end
 

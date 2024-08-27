@@ -74,7 +74,7 @@ include("compressible/diffusion.jl")
 export find_D!, viscous_step!
 
 include("compressible/relaxation.jl")
-export relaxation_step!
+export Relaxator, relaxation_step!
 
 include("compressible/fourier.jl")
 export ideal_temperature!, fourier_step!, fourier_dirichlet_bc!

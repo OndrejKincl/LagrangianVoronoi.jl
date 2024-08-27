@@ -2,7 +2,7 @@ module rtest
 include("../../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi, WriteVTK, Random, LinearAlgebra
 
-const dr = 0.01
+const dr = 0.1
 const dt = 1e-2
 const t_end = 1.0
 const nframes = 100
@@ -30,6 +30,9 @@ function ic!(p::VoronoiPolygon)
     p.e = e_init(p.x)
     p.D = MAT1
     p.mass = area(p)*p.rho
+    if p.x[2] > 0.5L
+        p.phase = 1
+    end
 end
 
 function get_errors(grid::VoronoiGrid)
@@ -47,6 +50,7 @@ end
 
 mutable struct Simulation <: SimulationWorkspace
     grid::GridNSc
+    rx::Relaxator{PolygonNSc}
     
     E_rho::Float64
     E_v::Float64
@@ -57,19 +61,31 @@ mutable struct Simulation <: SimulationWorkspace
     S::Float64 #entropy
     rho_min::Float64
     dv_max::Float64
-
+    Area0::Float64
+    Area1::Float64
     Simulation() = begin
         dom = Rectangle(VEC0, L*VECX + L*VECY)
         grid = GridNSc(dom, dr)
         Random.seed!(123)
-        populate_lloyd!(grid; ic! = ic!, niterations = 1)
-        return new(grid, 0.0, 0.0, 0.0, 0.0, VEC0, 0.0, 0.0, 0.0, 0.0)
+        # add some more random particles
+        for i in 1:round(Int, (L/dr)^2)
+            x1 = L*rand()
+            x2 = L*rand()
+            #if rand(Bool)
+            #    x2 /= 2
+            #end
+            push!(grid.polygons, PolygonNSc(RealVector(x1,x2)))
+        end
+        remesh!(grid)
+        apply_unary!(grid, ic!)
+        rx = Relaxator(grid, multiprojection=true)
+        return new(grid, rx, 0.0, 0.0, 0.0, 0.0, VEC0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     end
 end
 
 function step!(sim::Simulation, t::Float64)
     if (t > 0.0)
-        relaxation_step!(sim.grid, dt)
+        relaxation_step!(sim.rx, dt)
         remesh!(sim.grid)
     end
     ideal_eos!(sim.grid, gamma)
@@ -86,6 +102,8 @@ function postproc!(sim::Simulation, t::Float64)
     sim.S = 0.0
     sim.rho_min = Inf
     sim.dv_max = 0.0
+    sim.Area0 = 0.0
+    sim.Area1 = 0.0
     for p in sim.grid.polygons
         A = area(p)
         sim.E_rho += A*abs(p.rho - rho_init(p.x))
@@ -97,6 +115,11 @@ function postproc!(sim::Simulation, t::Float64)
         sim.S += p.mass*log(abs(p.P)/(abs(p.rho)^gamma))
         sim.rho_min = min(sim.rho_min, p.rho)
         sim.dv_max = max(sim.dv_max, norm(p.dv))
+        if p.phase == 0
+            sim.Area0 += A
+        else
+            sim.Area1 += A
+        end
     end
     println()
     @show t
@@ -109,13 +132,15 @@ function postproc!(sim::Simulation, t::Float64)
     @show sim.S
     @show sim.rho_min
     @show sim.dv_max
+    @show sim.Area0
+    @show sim.Area1
 end
 
 
 function main()
     sim = Simulation()
     run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :rho, :e, :P, :mass, :dv, :phi_rho),
+        vtp_vars = (:v, :rho, :e, :P, :mass, :dv, :phase),
         postproc! = postproc!,
         nframes = nframes
     )

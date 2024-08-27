@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (-1.0, 1.0)
 const ylims = (-1.0, 1.0)
-const N = 100 #resolution
+const N = 50 #resolution
 const dr = 1.0/N
 
 
@@ -82,7 +82,7 @@ function step!(sim::Simulation)
     v_shock = 0.4*sim.t^(-0.6)*(E_bomb/rho0)^0.2
     dt = CFL*dr/(sqrt(6.0)*v_shock)
     move!(sim.grid, dt)
-    ideal_eos!(sim.grid, gamma, Pmin = P0)
+    ideal_eos!(sim.grid, gamma, P0)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)

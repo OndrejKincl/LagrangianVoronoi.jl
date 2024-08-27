@@ -17,14 +17,14 @@ const N = 200 #resolution
 const dr = 1.0/N
 
 const dt = 0.1*dr/v_char
-const t_end =  1.0
+const t_end =  3.0
 const nframes = 100
 
-const c0 = 0.01
+const c0 = 1.0
 const gamma = 1.4
 const P0 = rho0*c0^2/gamma
 
-const export_path = "results/gresho/Ma$(1/c0)"
+const export_path = "results/gresho/norelax"
 
 # exact solution and initial velocity
 function v_exact(x::RealVector)::RealVector
@@ -73,7 +73,7 @@ function step!(sim::Simulation, t::Float64)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.grid, dt)
+    #relaxation_step!(sim.grid, dt)
     return
 end
 
@@ -143,32 +143,31 @@ function plot_midline_all_Mach()
     Ma001 = CSV.read(string("results/gresho/Ma0.01/midline_data.csv"), DataFrame)
     Ma01 = CSV.read(string("results/gresho/Ma0.1/midline_data.csv"), DataFrame)
     Ma1 = CSV.read(string("results/gresho/Ma1.0/midline_data.csv"), DataFrame)
-    Ma10 = CSV.read(string("results/gresho/Ma10.0/midline_data.csv"), DataFrame)
+    #Ma10 = CSV.read(string("results/gresho/Ma10.0/midline_data.csv"), DataFrame)
     Ma100 = CSV.read(string("results/gresho/Ma100.0/midline_data.csv"), DataFrame)
     plt = plot(
         xlabel = L"x",
-        ylabel = L"\Delta v_y",
+        ylabel = L"v_y",
         bottom_margin = 5mm,
     )
-    #=
     plot!(plt,
         Ma1.x,
         Ma1.vy_exact,
         label = "exact solution",
         color = :black,
         linewidth = 1.0,
-        #size = (400, 1000)
     )
-    =#
-    plot_y = [Ma0001.vy Ma001.vy Ma01.vy Ma1.vy Ma10.vy Ma100.vy]
-    plot_y = (plot_y .- Ma1.vy_exact)
+    plot_y = [Ma0001.vy Ma001.vy Ma01.vy Ma1.vy Ma100.vy]
+    #plot_y = (plot_y .- Ma1.vy_exact)
     plot!(plt,
         Ma1.x,
         plot_y,
-        label = ["Ma = 0.001 (stiffened)" "Ma = 0.01" "Ma = 0.1" "Ma = 1.0" "Ma = 10" "Ma = 100"],
-        markershape = :hex,
-        markersize = 2,
-        linewidth = 1.0
+        label = ["Ma = 0.001" "Ma = 0.01" "Ma = 0.1" "Ma = 1" "Ma = 100"],
+        #markershape = :hex,
+        #markersize = 2,
+        linewidth = 1.0,
+        color = [:blue :red :darkgreen :purple :orange],
+        markershape = [:hex :circ :star7 :utriangle :dtriangle]
     )
     savefig(plt, string("results/gresho/midline_plot_all_Mach.pdf"))
 end
