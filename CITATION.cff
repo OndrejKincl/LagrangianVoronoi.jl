@@ -1,0 +1,25 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: LagrangianVoronoi.jl
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Ondřej
+    family-names: Kincl
+    email: ondrej.kincl@unitn.it
+    affiliation: University of Trento
+repository-code: 'https://github.com/OndrejKincl/LagrangianVoronoi.jl'
+abstract: >-
+  LagrangianVoronoi.jl is a library which numerical
+  simulation of incompressible and compressible
+  Navier-Stokes fluids using moving Voronoi meshes.
+keywords:
+  - CFD
+  - Voronoi mesh
+  - Lagrangian method
+  - Semi-implicit integrator
+license: MIT
