@@ -3,7 +3,7 @@ function move!(grid::VoronoiGrid, dt::Float64)
         if any(isnan, p.v)
             throw("Velocity field invalidated.") 
         end
-        new_x = p.x + dt*p.v
+        new_x = periodic_proj(grid, p.x + dt*p.v)
         if isinside(grid.boundary_rect, new_x)
             p.x = new_x
         else # try to project v to tangent space
@@ -11,7 +11,7 @@ function move!(grid::VoronoiGrid, dt::Float64)
                 n = normal_vector(e)
                 p.v -= dot(p.v, n)*n
             end
-            new_x = p.x + dt*p.v
+            new_x = periodic_proj(grid, p.x + dt*p.v)
             if isinside(grid.boundary_rect, new_x)
                 p.x = new_x
             else # give up and halt the particle
@@ -21,6 +21,23 @@ function move!(grid::VoronoiGrid, dt::Float64)
     end
     remesh!(grid)
 end
+
+function periodic_proj(grid::VoronoiGrid, Z::RealVector)::RealVector
+    Zx = Z[1]
+    Zy = Z[2]
+    if grid.xperiodic
+        xperiod = abs(grid.boundary_rect.xmax[1] - grid.boundary_rect.xmin[1])
+        Zx = (Z[1] - grid.boundary_rect.xmin[1])%xperiod
+        Zx = (Zx + xperiod)%xperiod + grid.boundary_rect.xmin[1]
+    end
+    if grid.yperiodic   
+        yperiod = abs(grid.boundary_rect.xmax[2] - grid.boundary_rect.xmin[2])
+        Zy = (Z[2] - grid.boundary_rect.xmin[2])%yperiod
+        Zy = (Zy + yperiod)%yperiod + grid.boundary_rect.xmin[2]
+    end
+    return Zx*VECX + Zy*VECY
+end
+
 
 function accelerate!(grid::VoronoiGrid, dt::Float64)
     @batch for p in grid.polygons
@@ -45,7 +62,10 @@ function pressure_force!(grid::VoronoiGrid, dt::Float64; stabilize = true)
             end
             if LapP > 0.0
                 c = centroid(p)
-                p.a += 1.5*LapP/(p.mass)*(c - p.x)
+                acc = 1.5*LapP/(p.mass)*(c - p.x)
+                if dot(acc, p.v + dt*p.a) < 0.0
+                    p.a += acc
+                end 
             end
         end
     end

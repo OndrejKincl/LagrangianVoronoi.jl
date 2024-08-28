@@ -34,7 +34,7 @@ function populate_rect!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, i
     M = round(Int, (x2_max - x2_min)/grid.dr)
     for x1 in range(x1_min, x1_max, N)
         for x2 in range(x2_min, x2_max, M)
-            x = RealVector(x1, x2)
+            x = RealVector(x1, x2) + 0.5*RealVector(grid.dr, grid.dr)
             if charfun(x) && isinside(grid.boundary_rect, x)
                 push!(grid.polygons, T(x))
             end
@@ -94,6 +94,32 @@ function populate_lloyd!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, 
             p.x = centroid(p)
         end
     end
+    remesh!(grid)
+    @batch for p in grid.polygons
+        ic!(p)
+    end
+	return
+end
+
+function populate_hex!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, ic!::Function = _donothing) where T <: VoronoiPolygon
+    a = (4/3)^(1/4)*grid.dr
+    b = (3/4)^(1/4)*grid.dr
+    x1_max = grid.boundary_rect.xmax[1]
+    x2_max = grid.boundary_rect.xmax[2]
+    x1_min = grid.boundary_rect.xmin[1]
+    x2_min = grid.boundary_rect.xmin[2]
+    i_min = Int64(floor(x1_min/a)) - 1
+    j_min = Int64(floor(x2_min/b))
+    i_max = Int64(ceil(x1_max/a))
+    j_max = Int64(ceil(x2_max/b))
+	for i in i_min:i_max, j in j_min:j_max
+        x1 = (i + (j%2)/2)*a
+        x2 = j*b
+        x = RealVector(x1, x2)
+        if charfun(x) && isinside(grid.boundary_rect, x)
+            push!(grid.polygons, T(x))
+        end
+	end
     remesh!(grid)
     @batch for p in grid.polygons
         ic!(p)

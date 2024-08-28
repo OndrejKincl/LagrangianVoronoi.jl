@@ -5,15 +5,18 @@ using SmoothedParticles:rDwendland2
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
 
-include("../src/LagrangianVoronoi.jl")
+include("../../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
 const t_end = 0.2
-const Res = (400, 1000, Inf)
-const Ns = [16, 32, 48, 72, 108, 162]
+const Res = [400, 1000, Inf]
+const Ns = [16, 32, 48, 72, 108]#, 162]
+const c0 = 100.0
+const gamma = 1.4
+const P0 = rho0*c0^2/gamma
 
 const l_char = 1.0
 const v_char = 1.0
@@ -21,35 +24,33 @@ const v_char = 1.0
 const export_path = "results/tagr"
 
 function v_max(Re::Float64, t::Float64)::Float64
-    return exp(-2.0*pi^2*t/Re)
+    return exp(-4.0*pi^2*t/Re)
 end
 
 function ic!(p::VoronoiPolygon, Re::Float64)
-    p.rho = rho0
     p.v = v_exact(p.x, Re, 0.0)
+    p.rho = rho0
     p.mass = p.rho*area(p)
+    p.P = P_exact(p.x, Re, 0.0)
+    p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
 end
 
 function v_exact(x::RealVector, Re::Float64, t::Float64)::RealVector
-    u0 =  cos(pi*x[1])*sin(pi*x[2])
-    v0 = -sin(pi*x[1])*cos(pi*x[2])
+    u0 =  cos(2pi*x[1])*sin(2pi*x[2])
+    v0 = -sin(2pi*x[1])*cos(2pi*x[2])
     return v_max(Re, t)*(u0*VECX + v0*VECY)
 end
 
 function P_exact(x::RealVector, Re::Float64, t::Float64)::Float64
-    return 0.5*v_max(Re, t)*(sin(pi*x[1])^2 + sin(pi*x[2])^2 - 1.0)
-end
-
-function boundary_filter(x::RealVector)::Bool
-    return max(abs(x[1]), abs(x[2])) > 0.4
+    return 0.5*(v_max(Re, t)^2)*(sin(2pi*x[1])^2 + sin(2pi*x[2])^2 - 1.0)
 end
 
 mutable struct Simulation <: SimulationWorkspace
     dr::Float64
     dt::Float64
     Re::Float64
-    grid::GridNS
-    solver::PressureSolver{PolygonNS}
+    grid::GridNSc
+    solver::CompressibleSolver{PolygonNSc}
     v_err::Float64
     P_err::Float64
     E_err::Float64
@@ -57,49 +58,61 @@ mutable struct Simulation <: SimulationWorkspace
     Simulation(N::Int, Re::Number, structured::Bool) = begin
         Re = Float64(Re)
         dr = 1.0/N
-        dt = 0.03*min(dr, dr^2*Re)
+        dt = 0.1*min(dr, dr^2*Re)
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNS(domain, dr)
+        grid = GridNSc(domain, dr, xperiodic = true, yperiodic = true)
         structured ? populate_rect!(grid) : populate_vogel!(grid)
         _ic! = (p -> ic!(p, Re))
         apply_unary!(grid, _ic!)
-        solver = PressureSolver(grid)
+        solver = CompressibleSolver(grid)
         return new(dr, dt, Re, grid, solver, 0.0, 0.0, 0.0, 0.0)
     end
 end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, sim.dt)
-    viscous_force!(sim.grid, 1.0/sim.Re, sim.dt)
+    stiffened_eos!(sim.grid, gamma, P0)
     find_pressure!(sim.solver, sim.dt)
-    pressure_force!(sim.grid, sim.dt)
+    pressure_step!(sim.grid, sim.dt)
+    find_D!(sim.grid)
+    viscous_step!(sim.grid, sim.dt)
+    relaxation_step!(sim.grid, sim.dt)
+    return
 end
 
 function postproc!(sim::Simulation, t::Float64)
+    @show t
     grid = sim.grid
     sim.P_err = 0.0
     sim.v_err = 0.0
     sim.E_err = -0.5*v_max(sim.Re, t)^2
     sim.div = 0.0
     for p in grid.polygons
-        sim.E_err += p.mass*norm_squared(p.v)
-        boundary_filter(p.x) && continue
+        sim.E_err += p.mass*p.e
         sim.v_err += area(p)*norm_squared(p.v - v_exact(p.x, sim.Re, t))
         sim.P_err += area(p)*(p.P - P_exact(p.x, sim.Re, t))^2
-        # find the divergence of p
-        div = 0.0
-        for (q,e) in neighbors(p, grid)
-            lrr = lr_ratio(p, q, e)
-            m = 0.5*(e.v1 + e.v2)
-            z = 0.5*(p.x + q.x)
-            div += lrr*(dot(p.v - q.v, m - z) - 0.5*dot(p.v + q.v, p.x - q.x))
-        end
-        sim.div += area(p)*div^2
+        sim.div += area(p)*(dot(p.D, MAT1)^2)
     end
     sim.P_err = sqrt(sim.P_err)
     sim.v_err = sqrt(sim.v_err)
     sim.div = sqrt(sim.div)
+    @show sim.v_err
+    @show sim.P_err
+    @show sim.E_err
     return
+end
+
+function simple_test(Re::Number, N::Int; structured::Bool = true)
+    sim = Simulation(N, Re, structured)
+    run!(sim, sim.dt, t_end, step!; 
+        postproc! = postproc!,
+        nframes = 100, 
+        path = joinpath(export_path, "N$N"),
+        save_csv = false,
+        save_points = false,
+        save_grid = true,
+        vtp_vars = (:P, :v, :rho)
+    )
 end
 
 function get_convergence(Re::Number, structured::Bool)

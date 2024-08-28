@@ -1,0 +1,130 @@
+\documentclass{article}
+\usepackage[english]{babel}
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+\title{All-Mach Number Semi-Implicit Lagrangian Voronoi Approximation for Compressible Fluid Flows}
+\author{Ondřej Kincl, Ilya Peshkov, Walter Boscheri}
+
+\usepackage{physics}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage{mathbbol}
+\usepackage{siunitx}
+\usepackage{lipsum}
+\usepackage{subcaption}
+\usepackage[dvipsnames]{xcolor}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{Remark}
+
+
+\newcommand{\vv}{\bm{v}}
+\newcommand{\xx}{\bm{x}}
+\newcommand{\rr}{\bm{r}}
+\newcommand{\yy}{\bm{y}}
+\newcommand{\mm}{\bm{m}}
+\newcommand{\zz}{\bm{z}}
+\newcommand{\ff}{\bm{f}}
+\newcommand{\oxx}{\bm{\overline{x}}}
+\newcommand{\comment}[1]{}
+\newcommand{\timestep}{k}
+
+\newcommand{\old}[1]{{#1}^{\mathrm{old}}}
+\newcommand{\sgrad}[2]{  \langle \nabla #1  \rangle_{#2}}
+\newcommand{\wgrad}[2]{ \langle \widetilde{\nabla} #1 \rangle_{#2}}
+\newcommand{\wdiv}[2]{  \langle \widetilde{\nabla} \cdot #1  \rangle_{#2}}
+\newcommand{\sdiv}[2]{  \langle \nabla \cdot #1  \rangle_{#2}}
+\newcommand{\Tgrad}[2]{ \langle \nabla^T #1 \rangle_{#2}}
+\newcommand{\Tdiv}[2]{  \langle \nabla^T \cdot #1  \rangle_{#2}}
+\newcommand{\lap}[2]{ \langle \Delta #1  \rangle_{#2}}
+
+\DeclareMathOperator{\dist}{dist}
+\DeclareMathOperator{\diam}{diam}
+\DeclareMathOperator{\sym}{sym}
+
+
+\begin{document}
+	%\maketitle
+		
+\section{Asymptotically Lagrangian hydrodynamic simulation on a moving Voronoi mesh - MUSCL approach}
+We start from an ALE formulation of Euler-fluid equation:
+\begin{equation}
+	\dv{}{t}\begin{pmatrix}
+		M_i \\
+		\bm{P}_i \\
+		E_i
+	\end{pmatrix} = -\sum_j \frac{|\Gamma_{ij}|}{r_{ij}}\left. \begin{pmatrix}
+	\rho (\delta \bm{v} \cdot \xx_{ij}) \\
+	\rho (\delta \bm{v} \cdot \xx_{ij}) \vv - p \xx_{ij} \\
+	\rho e (\delta \bm{v} \cdot \xx_{ij}) - p \bm{v} \cdot \xx_{ij}
+\end{pmatrix} \right|_{\bm{m}_{ij}} \label{eq:flux}
+\end{equation}
+Here, $M_i, \bm{P}_i, E_i$ represent the total mass, momentum and energy of a cell $i$ respectively, $\xx_{ij} = \xx_i - \xx_j$ is the inter-seed difference vector (playing the role of surface normal) and $\delta \bm{v}_i$ is the \textit{repair velocity } (the mesh velocity minus physical viscosity). The flux on the right hand side is to be evaluated at a facet midpoint $\bm{m}_{ij}$. To this end, we first compute the point values $\rho_i, \vv_i$ and $e_i$ associated with \textit{cell midpoints} $\bm{c}_i$ using:
+\begin{equation}
+	\begin{split}
+		M_i =& |\omega_i| \rho_i,\\
+		\bm{P}_i =& |\omega_i| \rho_i \vv_i, \\
+		E_i =& |\omega_i| \rho_i e_i.
+	\end{split}
+\end{equation}
+Then, the gradient of each intensive variable $\rho_i, \vv_i$ and $e_i$ is estimated using least square reconstruction on stencils. Knowing the gradient, we obtain an interpolation using a first degree Taylor polynomial. A slope limiter will be used to ensure that no new extrema are introduced by the interpolation (we need this because of Godunov theorem but also not to stumble upon negative density). 
+
+The repair velocity at seed locations will be selected as
+\begin{equation}
+	\delta \vv(\xx_i) = \alpha |\mathbb{D}_i| (\bm{c}_i - \xx_i)
+\end{equation}
+where $\alpha$ is dimensionless parameter and $\mathbb{D}$ is a velocity deformation tensor (which can be computed from the gradient of $\vv$, which is already available). The normal component of repair velocity at the facet is \textit{precisely}
+\begin{equation}
+	\delta \vv|_{\Gamma_{ij}} \cdot \xx_{ij} = \frac{\delta \vv(\xx_i) + \delta \vv(\xx_j)}{2} \cdot \xx_{ij}
+\end{equation}
+(the facet is a subset of points equidistant to $\xx_i$ and $\xx_j$).
+Pressure is computed from an equation of state. The left and right values of $\rho, \vv, p$ at $\bm{m}_{ij}$ are used to compute the flux in \eqref{eq:flux} using an approximate Riemann Solver {\color{red}(please help)}. 
+
+Finally, the seed locations are updated according to:
+\begin{equation}
+	\dv{\xx_i}{t} = \vv(\xx_i) + \delta \vv(\xx_i)
+\end{equation}
+
+In summary, we now have a semi-discrete prescription 
+\begin{equation}
+	\begin{pmatrix}
+		M \\
+		\bm{P} \\
+		E \\
+		\xx 
+	\end{pmatrix}
+	\mapsto 
+	\dv{}{t}\begin{pmatrix}
+		M \\
+		\bm{P} \\
+		E \\
+		\xx 
+	\end{pmatrix}
+\end{equation}
+and we can choose any time discretization we like. I think we can use explicit midpoint rule to get quadratic convergence in time.
+
+The scheme is asymptotically Lagrangian (for smooth flows) because
+\begin{equation}
+	\delta \vv \to 0
+\end{equation}
+for $h \to 0$.
+
+\begin{equation}
+	\begin{split}
+		(\rho E)^{n+1} &= (\rho e)^{n+1} + \frac{1}{2\rho^{n+1}}( \rho\bm{u})^{n+1} \cdot (\rho \bm{u})^{n+1} \\
+		&= (\rho e)^{n+1} + \frac{1}{2\rho^{n+1}}(\rho\bm{u})^{n} \cdot (\rho\bm{u})^{n} + \frac{1}{\rho^{n+1}}((\rho\bm{u})^{n+1} - (\rho\bm{u})^{n}) \cdot (\rho\bm{u})^{n} + O(\delta t^2)\\
+		&= (\rho e)^{n+1} + \frac{1}{2\rho^{n+1}}(2(\rho\bm{u})^{n+1} - (\rho \bm{u})^{n}) \cdot (\rho\bm{u})^{n} + O(\delta t^2)
+	\end{split}
+\end{equation}
+
+
+\begin{equation}
+	\pdv{\bm{c}_i}{\xx_j} = \frac{1}{|\omega_i|} \pdv{|\omega_i| \bm{c}_i}{\xx_j} - \frac{1}{|\omega_i|}\bm{c}_i \otimes \pdv{|\omega_i|}{\xx_j} = \frac{1}{|\omega_i|}\pdv{}{\xx_j}\int_{\omega_i} \xx \; \dd \xx -  \frac{\bm{c}_i}{|\omega_i|} \otimes \pdv{}{\xx_j} \int \dd \xx
+\end{equation}
+
+\end{document}
+
+
