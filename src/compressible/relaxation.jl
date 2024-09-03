@@ -20,10 +20,11 @@ function mul!(y::ThreadedVec{Float64}, A::MultiphaseProjector, x::ThreadedVec{Fl
                     lrr = lr_ratio(pq,e)
                     m = 0.5*(e.v1 + e.v2)
                     j = e.label
-                    A.tmp_vec[i] -= lrr*(x[i]/area(p) - x[j]/area(q))*(m - p.x)
+                    A.tmp_vec[i] -= lrr*(x[i] - x[j])*(m - p.x)
                 end
             end
         end
+        A.tmp_vec[i] /= area(p)
     end
     @batch for i in 1:A.n
         y[i] = 0.0
@@ -40,7 +41,6 @@ function mul!(y::ThreadedVec{Float64}, A::MultiphaseProjector, x::ThreadedVec{Fl
                 end
             end
         end
-        y[i] /= area(p)
     end
     
     return y
@@ -57,7 +57,7 @@ struct Relaxator{T}
     A::MultiphaseProjector{T}
     b::ThreadedVec{Float64}
     q::ThreadedVec{Float64}
-    ms::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
+    mr::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
     alpha::Float64
     rusanov::Bool
     multiprojection::Bool
@@ -66,8 +66,8 @@ struct Relaxator{T}
         A = MultiphaseProjector(grid)
         b = ThreadedVec{Float64}(undef, n)
         q = ThreadedVec{Float64}(undef, n)
-        ms = MinresSolver(A, b)
-        return new{T}(n, grid, A, b, q, ms, alpha, rusanov, multiprojection)
+        mr = MinresSolver(A, b)
+        return new{T}(n, grid, A, b, q, mr, alpha, rusanov, multiprojection)
     end
 end
 
@@ -86,19 +86,18 @@ function refresh!(rx::Relaxator)
                 rx.b[i] -= lrr*(dot(p.dv - q.dv, mz) - 0.5*dot(p.dv + q.dv, pq))
             end
         end
-        rx.b[i] /= area(p)
     end
 end
 
 function multiphase_projection!(rx::Relaxator)
     refresh!(rx)
-    minres!(rx.ms, rx.A, rx.b, atol = 1e-4, rtol = 1e-4, itmax = 200)
-    stats = statistics(rx.ms)
-    if stats.solved == false
-        @warn "multiphase projector failed"
-        return
-    end
-    y = solution(rx.ms)
+    minres!(rx.mr, rx.A, rx.b, atol = 1e-3, rtol = 1e-3, itmax = 20)
+    #stats = statistics(rx.mr)
+    #if stats.solved == false
+        #@warn("multiphase projector failed")
+        #return
+    #end
+    y = solution(rx.mr)
     grid = rx.grid
     @batch for i in eachindex(y)
         @inbounds begin
@@ -108,7 +107,7 @@ function multiphase_projection!(rx::Relaxator)
                     j = e.label
                     pq = get_arrow(p.x,q.x,grid)
                     m = 0.5*(e.v1 + e.v2)
-                    p.dv += lr_ratio(pq,e)*(y[i]/area(p) - y[j]/area(q))*(m - p.x)
+                    p.dv += lr_ratio(pq,e)*(y[i] - y[j])*(m - p.x)/area(p)
                 end
             end
         end
@@ -119,26 +118,17 @@ end
 function relaxation_step!(rx::Relaxator, dt::Float64)
     grid = rx.grid
     @batch for p in grid.polygons
+        p.dv = VEC0
         p.momentum = p.mass*p.v
         p.energy = p.mass*p.e
-        lambda = rx.alpha*norm(p.D)
-        p.dv = lambda/(1.0 + dt*lambda)*(centroid(p) - p.x)
-
-        #projection on a multiphase boundary
-
-        #=
-        phi = VEC0
-        for (q,e) in neighbors(p, grid)
-            if q.phase != p.phase
-                pq = get_arrow(p.x,q.x,grid)
-                lrr = lr_ratio(pq,e)
-                phi += lrr*pq 
-            end
+        #lambda = rx.alpha*norm(p.D)
+        c = centroid(p)
+        cx_dist = norm(c - p.x)
+        tol = 0.05*sqrt(area(p))
+        if cx_dist > tol
+            p.dv = ((1.0 - tol/cx_dist)/dt)*(c - p.x)
         end
-        if phi != VEC0
-            p.dv -= (dot(phi, p.dv)/dot(phi, phi))*phi
-        end
-        =#
+        #p.dv = lambda/(1.0 + dt*lambda)*(centroid(p) - p.x)
     end
     if rx.multiprojection
         multiphase_projection!(rx)

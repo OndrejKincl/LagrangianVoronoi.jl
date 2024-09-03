@@ -1,8 +1,3 @@
-struct Cutter
-    x::RealVector
-    label::Int
-end
-
 mutable struct VoronoiGrid{T}
     dr::Float64
     h::Float64
@@ -16,7 +11,6 @@ mutable struct VoronoiGrid{T}
     yperiodic::Bool
     xperiod::Float64
     yperiod::Float64
-    cutters::FastVector{Cutter}
     period_tol::Float64
     VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64;
     h = 2dr, r_max = 10dr, period_tol = 10dr,
@@ -26,8 +20,6 @@ mutable struct VoronoiGrid{T}
         xperiod = boundary_rect.xmax[1] - boundary_rect.xmin[1]
         yperiod = boundary_rect.xmax[2] - boundary_rect.xmin[2]
         extended_rect = Rectangle(extended_xmin, extended_xmax)
-        n = round(Int, area(extended_rect)/(dr^2))
-        cutters = FastVector{Cutter}(n)
         cell_list = CellList(h, extended_rect)
         polygons = T[]
         index_containers = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
@@ -44,7 +36,6 @@ mutable struct VoronoiGrid{T}
             yperiodic,
             xperiod,
             yperiod,
-            cutters,
             period_tol,
         )
     end
@@ -68,62 +59,28 @@ end
             continue
         end
         for i in grid.cell_list.cells[key]
-            y = grid.cutters[i].x
-            label = grid.cutters[i].label
-            if (poly.x == y) || (norm_squared(poly.x-y) > prr)
+            q = grid.polygons[i]
+            if (poly.x == q.x) || (norm_squared(poly.x-q.x) > prr)
                 continue
             end
-            if voronoicut!(poly, y, label)
+            y = poly.x + get_arrow(q.x, poly.x, grid)
+            if voronoicut!(poly, y, i)
                 prr = influence_rr(poly)
             end
         end
     end
 end
 
-function make_cutter!(grid::VoronoiGrid, x::RealVector, label::Int)
-    c = Cutter(x, label)
-    push!(grid.cutters, c)
-    j = length(grid.cutters)
-    insert!(grid.cell_list, c.x, j)
-end
-
 @inbounds function remesh!(grid::VoronoiGrid)::Nothing
-    # empty the cutter list
-    empty!(grid.cutters)
     # clear the cell list
-    for cell in grid.cell_list.cells
+    @batch for cell in grid.cell_list.cells
         empty!(cell)
     end
-    # reset voronoi cells, generate cutters and add them to the cell list
-    for i in eachindex(grid.polygons)
+    # reset voronoi cells and add them to the cell list
+    @batch for i in eachindex(grid.polygons)
         poly = grid.polygons[i]
         reset!(poly, grid.extended_rect)
-        make_cutter!(grid, poly.x, i)
-    end
-    # edge periodic maps
-    if grid.xperiodic
-        N = length(grid.cutters)
-        for i in 1:N
-            c = grid.cutters[i]
-            if (grid.boundary_rect.xmax[1] - grid.period_tol < c.x[1])
-                make_cutter!(grid, c.x - grid.xperiod*VECX, c.label)
-            end
-            if (grid.boundary_rect.xmin[1] + grid.period_tol > c.x[1])
-                make_cutter!(grid, c.x + grid.xperiod*VECX, c.label)
-            end 
-        end
-    end
-    if grid.yperiodic
-        N = length(grid.cutters)
-        for i in 1:N
-            c = grid.cutters[i]
-            if (grid.boundary_rect.xmax[2] - grid.period_tol < c.x[2])
-                make_cutter!(grid, c.x - grid.yperiod*VECY, c.label)
-            end
-            if (grid.boundary_rect.xmin[2] + grid.period_tol > c.x[2])
-                make_cutter!(grid, c.x + grid.yperiod*VECY, c.label)
-            end 
-        end
+        insert_periodic!(grid, poly.x, i)
     end
     # cut all voronoi cells
     @batch for i in eachindex(grid.polygons)
@@ -132,6 +89,40 @@ end
     end
     return
 end
+
+# get shortest vector from x to y
+# is equal to x - y on non-periodic domains
+function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)
+    v = x - y
+    if grid.xperiodic && (abs(v[1]) > 0.5*grid.xperiod)
+        v -= sign(v[1])*grid.xperiod*VECX
+    end
+    if grid.yperiodic && (abs(v[2]) > 0.5*grid.yperiod)
+        v -= sign(v[2])*grid.yperiod*VECY
+    end
+    return v
+end
+
+function insert_periodic!(grid::VoronoiGrid, x::RealVector, label::Int)
+    cl = grid.cell_list
+    insert!(cl, x, label)
+    if grid.xperiodic
+        insert!(cl, x + grid.xperiod*VECX, label)
+        insert!(cl, x - grid.xperiod*VECX, label)
+    end
+    if grid.yperiodic
+        insert!(cl, x + grid.yperiod*VECY, label)
+        insert!(cl, x - grid.yperiod*VECY, label)
+    end
+    if grid.xperiodic && grid.yperiodic
+        insert!(cl, x + grid.xperiod*VECX + grid.yperiod*VECY, label)
+        insert!(cl, x + grid.xperiod*VECX - grid.yperiod*VECY, label)
+        insert!(cl, x - grid.xperiod*VECX + grid.yperiod*VECY, label)
+        insert!(cl, x - grid.xperiod*VECX - grid.yperiod*VECY, label)
+    end
+end
+
+
 
 function _getNeighbors(grid::VoronoiGrid{T}, poly::T) where T <: VoronoiPolygon
     container = grid.index_containers[Threads.threadid()]

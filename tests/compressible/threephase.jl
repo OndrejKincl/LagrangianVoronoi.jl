@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (0.0, 7.0)
 const ylims = (0.0, 3.0)
-const dr = 2e-2
+const dr = 3e-2
 
 struct FluidPhase
     label::Int
@@ -31,12 +31,12 @@ const phase2 = FluidPhase(2, 1, 0.1, 1.4, 1, 7, 0, 1.5)
 const phase3 = FluidPhase(3, 0.125, 0.1, 1.5, 1, 7, 1.5, 3)
 const fluidphases = [phase1, phase2, phase3]
 
-const nframes = 200
-const CFL = 0.05
-const v_char = 1.0
+const nframes = 50
+const CFL = 0.1
+const v_char = 2.0
 const dt = CFL*dr/v_char
 
-const t_end = 3.0
+const t_end = 1.0
 
 const export_path = "results/three_phase2"
 
@@ -81,14 +81,13 @@ mutable struct Simulation <: SimulationWorkspace
         populate_hex!(grid, ic! = ic!)
         #populate_lloyd!(grid, ic! = ic!)
         solver = CompressibleSolver(grid)
-        rx = Relaxator(grid; alpha = 500.0, multiprojection = true)
+        rx = Relaxator(grid; multiprojection = false)
     return new(grid, solver, 0.0, 0.0, 0.0, 0.0, true, rx)
     end
 end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
-    gravity_step!(sim.grid, -g*VECY, dt)
     multi_eos!(sim.grid)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
@@ -129,7 +128,7 @@ function main()
         nframes = nframes, 
         path = export_path,
         save_csv = false,
-        save_points = false,
+        save_points = true,
         save_grid = true,
         vtp_vars = (:P, :v, :rho, :phase)
     )

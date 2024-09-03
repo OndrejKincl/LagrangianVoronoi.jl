@@ -2,7 +2,7 @@ module rtest
 include("../../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi, WriteVTK, Random, LinearAlgebra
 
-const dr = 0.1
+const dr = 0.01
 const dt = 1e-2
 const t_end = 1.0
 const nframes = 100
@@ -71,9 +71,9 @@ mutable struct Simulation <: SimulationWorkspace
         for i in 1:round(Int, (L/dr)^2)
             x1 = L*rand()
             x2 = L*rand()
-            #if rand(Bool)
-            #    x2 /= 2
-            #end
+            if rand(Bool)
+                x2 /= 2
+            end
             push!(grid.polygons, PolygonNSc(RealVector(x1,x2)))
         end
         remesh!(grid)

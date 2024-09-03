@@ -66,15 +66,3 @@ function lr_ratio(dx::RealVector, e::Edge)::Float64
     return sqrt(l2/r2)
 end
 
-# get vector from x to y
-# is equal to x - y on non-periodic domains
-function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)
-    v = x - y
-    if grid.xperiodic && (abs(v[1]) > 0.5*grid.xperiod)
-        v -= sign(v[1])*grid.xperiod*VECX
-    end
-    if grid.yperiodic && (abs(v[2]) > 0.5*grid.yperiod)
-        v -= sign(v[2])*grid.yperiod*VECY
-    end
-    return v
-end
