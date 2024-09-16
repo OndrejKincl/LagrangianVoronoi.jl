@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (0.0, 7.0)
 const ylims = (0.0, 3.0)
-const dr = 3e-2
+const dr = 1e-2
 
 struct FluidPhase
     label::Int
@@ -31,14 +31,14 @@ const phase2 = FluidPhase(2, 1, 0.1, 1.4, 1, 7, 0, 1.5)
 const phase3 = FluidPhase(3, 0.125, 0.1, 1.5, 1, 7, 1.5, 3)
 const fluidphases = [phase1, phase2, phase3]
 
-const nframes = 50
+const nframes = 200
 const CFL = 0.1
-const v_char = 2.0
+const v_char = 1.5
 const dt = CFL*dr/v_char
 
-const t_end = 1.0
+const t_end = 3.0
 
-const export_path = "results/three_phase2"
+const export_path = "results/three_phase3"
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
@@ -73,6 +73,7 @@ mutable struct Simulation <: SimulationWorkspace
     S::Float64
     E0::Float64
     S0::Float64
+    quality::Float64
     first_step::Bool
     rx::Relaxator{PolygonNSc}
     Simulation() = begin
@@ -81,8 +82,8 @@ mutable struct Simulation <: SimulationWorkspace
         populate_hex!(grid, ic! = ic!)
         #populate_lloyd!(grid, ic! = ic!)
         solver = CompressibleSolver(grid)
-        rx = Relaxator(grid; multiprojection = false)
-    return new(grid, solver, 0.0, 0.0, 0.0, 0.0, true, rx)
+        rx = Relaxator(grid; multiprojection = true)
+    return new(grid, solver, 0.0, 0.0, 0.0, 0.0, 0.0, true, rx)
     end
 end
 
@@ -103,10 +104,12 @@ function postproc!(sim::Simulation, t::Float64)
     grid = sim.grid
     sim.E = 0.0
     sim.S = 0.0
+    sim.quality = Inf
     for p in grid.polygons
         fp = fluidphases[p.phase]
         sim.E += p.mass*p.e
         sim.S += p.mass*(log(abs(p.P)) - fp.gamma*log(abs(p.rho)))
+        sim.quality = min(sim.quality, p.quality)
     end
     if sim.first_step
         sim.E0 = sim.E
@@ -117,6 +120,7 @@ function postproc!(sim::Simulation, t::Float64)
     sim.S -= sim.S0
     @show sim.E
     @show sim.S
+    @show sim.quality
     println()
     return
 end
@@ -130,7 +134,7 @@ function main()
         save_csv = false,
         save_points = true,
         save_grid = true,
-        vtp_vars = (:P, :v, :rho, :phase)
+        vtp_vars = (:P, :v, :rho, :phase, :quality)
     )
 end
 

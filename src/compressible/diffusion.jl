@@ -17,7 +17,8 @@ function find_D!(grid::VoronoiGrid; noslip::Bool = true)
     end
 end
 
-function viscous_step!(grid::VoronoiGrid, dt::Float64; artificial_visc = true)
+
+function viscous_step_legacy!(grid::VoronoiGrid, dt::Float64; artificial_visc = true)
     @batch for p in grid.polygons
         divv = dot(p.D, MAT1)
         mu = p.mu
@@ -44,4 +45,36 @@ function viscous_step!(grid::VoronoiGrid, dt::Float64; artificial_visc = true)
     end
     
     
+end
+
+
+function viscous_step!(grid::VoronoiGrid, dt::Float64; artificial_visc = true)
+    @batch for p in grid.polygons
+        mu = p.mu
+        p.a = VEC0
+        divv = dot(p.D, MAT1)
+        if artificial_visc && (divv < 0.0)
+            mu -= divv*p.rho*grid.dr^2
+        end
+        p.S = 2.0*mu*(p.D - divv*MAT1/3)
+        for (q,e) in neighbors(p, grid)
+            pq = get_arrow(p.x, q.x, grid)
+            lrr = lr_ratio(pq, e)
+            m = 0.5*(e.v1 + e.v2)
+            p.a -= (mu/3)*lrr/p.mass*dot(p.D - q.D, MAT1)*(m - p.x)
+            p.a -= mu*lrr/p.mass*(p.v - q.v)
+        end
+    end
+    @batch for p in grid.polygons
+        for (q,e) in neighbors(p, grid)
+            pq = get_arrow(p.x, q.x, grid)
+            m = 0.5*(e.v1 + e.v2)
+            mp = get_arrow(m, p.x, grid)
+            mq = get_arrow(m, q.x, grid)
+            p.e += dt*lr_ratio(pq,e)/p.mass*(dot(mp, q.S*p.v) - dot(mq, p.S*q.v))
+        end
+    end
+    @batch for p in grid.polygons
+        p.v += dt*p.a
+    end
 end

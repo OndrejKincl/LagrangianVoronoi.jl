@@ -39,3 +39,20 @@ function Base.iterate(itr::PolygonBoundaryIterator, i::Int = 0)::Union{Nothing, 
     end
     return nothing
 end
+
+function movingavg(x::AbstractVector, radius::Integer=1)
+    y = similar(x)
+    len = length(x)
+    for i in eachindex(x)
+        lo = max(i-radius, 1)
+        hi = min(i+radius, len)
+        nsummands = 0
+        y[i] = zero(eltype(x))
+        for j in lo:hi
+            y[i] += x[j]
+            nsummands += 1
+        end
+        y[i] /= nsummands
+    end
+    return y
+end

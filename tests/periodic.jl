@@ -5,7 +5,7 @@ const dt = 1/100
 const t_end = 1.0
 
 include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi, WriteVTK
+using .LagrangianVoronoi, WriteVTK, Plots
 
 function set_v!(grid::VoronoiGrid)
     for p in grid.polygons
@@ -14,7 +14,6 @@ function set_v!(grid::VoronoiGrid)
         p.v = v1*VECX + v2*VECY
     end
 end
-
 
 function highlight_cell!(grid::VoronoiGrid)
     for p in grid.polygons

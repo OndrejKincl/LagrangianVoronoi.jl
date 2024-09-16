@@ -18,7 +18,7 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.2*dr/v_char
-const t_end =  2.0
+const t_end =  20*dt
 const nframes = 200
 
 const h_stab = 2.0*dr
@@ -64,11 +64,12 @@ function SPH_stabilizer!(p::VoronoiPolygon, q::VoronoiPolygon, r::Float64)
 end
 
 function step!(sim::Simulation, t::Float64)
-    move!(sim.grid, dt)
-    apply_local!(sim.grid, SPH_stabilizer!, h_stab)
+    println()
+    @time move!(sim.grid, dt)
+    @time apply_local!(sim.grid, SPH_stabilizer!, h_stab)
     #lloyd_step!(sim.grid, dt, 1000.0)
-    find_pressure!(sim.solver, dt)
-    pressure_force!(sim.grid, dt, stabilize=false)
+    @time find_pressure!(sim.solver, dt)
+    @time pressure_force!(sim.grid, dt, stabilize=false)
     return
 end
 

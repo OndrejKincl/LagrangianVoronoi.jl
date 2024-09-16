@@ -41,7 +41,7 @@ include("utils/threadedvec.jl")
 export ThreadedVec
 
 include("utils/iterators.jl")
-export neighbors, boundaries
+export neighbors, boundaries, movingavg
 
 include("utils/newtonlloyd.jl")
 export newtonlloyd!

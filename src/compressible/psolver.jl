@@ -111,7 +111,7 @@ function find_pressure!(solver::CompressibleSolver, dt::Float64, niter::Int64 = 
         refresh!(solver, dt, (it > 1))
         minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
         x = solution(solver.ms)
-        @batch for i in eachindex(x)
+        for i in eachindex(x)
             @inbounds solver.grid.polygons[i].P = x[i]
         end
     end

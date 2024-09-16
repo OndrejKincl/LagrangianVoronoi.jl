@@ -2,13 +2,24 @@ module rtest
 include("../../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi, WriteVTK, Random, LinearAlgebra
 
-const dr = 0.01
-const dt = 1e-2
-const t_end = 1.0
+const dr = 1.0/40
+const dt = 1e-3
+const t_end = 0.1
 const nframes = 100
-const L = 1.0
 const gamma = 1.4
 const export_path = "results/rtest"
+
+const WHITE = 1
+const BLACK = 2
+const NEUTRAL = 3
+
+function get_phase(x::RealVector)::Int
+    (norm(x) >= 1.0) && return NEUTRAL
+    (norm(x - 0.5*VECY) < 1/6) && return WHITE
+    (norm(x + 0.5*VECY) < 1/6) && return BLACK
+    s = sign(x[2])*sqrt(0.25 - (0.5 - abs(x[2]))^2)
+    return (x[1] > s ? WHITE : BLACK)
+end
 
 function rho_init(x::RealVector)
     1.0 #+ 0.1*cos(x[1]) + 0.3*cos(3*x[2])
@@ -30,9 +41,7 @@ function ic!(p::VoronoiPolygon)
     p.e = e_init(p.x)
     p.D = MAT1
     p.mass = area(p)*p.rho
-    if p.x[2] > 0.5L
-        p.phase = 1
-    end
+    p.phase = get_phase(p.x)
 end
 
 function get_errors(grid::VoronoiGrid)
@@ -61,24 +70,27 @@ mutable struct Simulation <: SimulationWorkspace
     S::Float64 #entropy
     rho_min::Float64
     dv_max::Float64
-    Area0::Float64
-    Area1::Float64
+    white_area::Float64
+    black_area::Float64
     Simulation() = begin
-        dom = Rectangle(VEC0, L*VECX + L*VECY)
+        dom = Rectangle(-(VECX + VECY), (VECX + VECY))
         grid = GridNSc(dom, dr)
-        Random.seed!(123)
+        Random.seed!(42)
+        populate_rand!(grid; ic! = ic!)
         # add some more random particles
-        for i in 1:round(Int, (L/dr)^2)
-            x1 = L*rand()
-            x2 = L*rand()
-            if rand(Bool)
-                x2 /= 2
+        N = 3*count(p -> (p.phase == BLACK), grid.polygons)
+        while N > 0
+            x1 = 2rand() - 1.0
+            x2 = 2rand() - 1.0
+            x = RealVector(x1, x2)
+            if get_phase(x) == BLACK
+                push!(grid.polygons, PolygonNSc(x))
+                N -= 1
             end
-            push!(grid.polygons, PolygonNSc(RealVector(x1,x2)))
         end
         remesh!(grid)
         apply_unary!(grid, ic!)
-        rx = Relaxator(grid, multiprojection=true)
+        rx = Relaxator(grid, multiprojection=false)
         return new(grid, rx, 0.0, 0.0, 0.0, 0.0, VEC0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     end
 end
@@ -102,8 +114,8 @@ function postproc!(sim::Simulation, t::Float64)
     sim.S = 0.0
     sim.rho_min = Inf
     sim.dv_max = 0.0
-    sim.Area0 = 0.0
-    sim.Area1 = 0.0
+    sim.black_area = 0.0
+    sim.white_area = 0.0
     for p in sim.grid.polygons
         A = area(p)
         sim.E_rho += A*abs(p.rho - rho_init(p.x))
@@ -115,10 +127,11 @@ function postproc!(sim::Simulation, t::Float64)
         sim.S += p.mass*log(abs(p.P)/(abs(p.rho)^gamma))
         sim.rho_min = min(sim.rho_min, p.rho)
         sim.dv_max = max(sim.dv_max, norm(p.dv))
-        if p.phase == 0
-            sim.Area0 += A
-        else
-            sim.Area1 += A
+        if p.phase == BLACK
+            sim.black_area += A
+        end
+        if p.phase == WHITE
+            sim.white_area += A
         end
     end
     println()
@@ -132,8 +145,8 @@ function postproc!(sim::Simulation, t::Float64)
     @show sim.S
     @show sim.rho_min
     @show sim.dv_max
-    @show sim.Area0
-    @show sim.Area1
+    @show sim.black_area
+    @show sim.white_area
 end
 
 

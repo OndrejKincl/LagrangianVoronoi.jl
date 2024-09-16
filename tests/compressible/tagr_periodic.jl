@@ -9,12 +9,12 @@ include("../../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const rho0 = 1.0
-const xlims = (-0.5, 0.5)
-const ylims = (-0.5, 0.5)
+const xlims = (0.0, 1.0)
+const ylims = (0.0, 1.0)
 const t_end = 0.2
 const Res = [400, 1000, Inf]
-const Ns = [16, 32, 48, 72, 108]#, 162]
-const c0 = 100.0
+const Ns = [32, 48, 72, 108, 162]
+const c0 = 1000.0
 const gamma = 1.4
 const P0 = rho0*c0^2/gamma
 
@@ -24,7 +24,7 @@ const v_char = 1.0
 const export_path = "results/tagr"
 
 function v_max(Re::Float64, t::Float64)::Float64
-    return exp(-4.0*pi^2*t/Re)
+    return exp(-8.0*pi^2*t/Re)
 end
 
 function ic!(p::VoronoiPolygon, Re::Float64)
@@ -33,6 +33,7 @@ function ic!(p::VoronoiPolygon, Re::Float64)
     p.mass = p.rho*area(p)
     p.P = P_exact(p.x, Re, 0.0)
     p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+    p.mu = 1.0/Re
 end
 
 function v_exact(x::RealVector, Re::Float64, t::Float64)::RealVector
@@ -55,17 +56,21 @@ mutable struct Simulation <: SimulationWorkspace
     P_err::Float64
     E_err::Float64
     div::Float64
-    Simulation(N::Int, Re::Number, structured::Bool) = begin
+    rx::Relaxator{PolygonNSc}
+    first_it::Bool
+    E0::Float64
+    Simulation(N::Int, Re::Number) = begin
         Re = Float64(Re)
         dr = 1.0/N
         dt = 0.1*min(dr, dr^2*Re)
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr, xperiodic = true, yperiodic = true)
-        structured ? populate_rect!(grid) : populate_vogel!(grid)
+        populate_hex!(grid)
         _ic! = (p -> ic!(p, Re))
         apply_unary!(grid, _ic!)
         solver = CompressibleSolver(grid)
-        return new(dr, dt, Re, grid, solver, 0.0, 0.0, 0.0, 0.0)
+        rx = Relaxator(grid)
+        return new(dr, dt, Re, grid, solver, 0.0, 0.0, 0.0, 0.0, rx, true, 0.0)
     end
 end
 
@@ -74,9 +79,9 @@ function step!(sim::Simulation, t::Float64)
     stiffened_eos!(sim.grid, gamma, P0)
     find_pressure!(sim.solver, sim.dt)
     pressure_step!(sim.grid, sim.dt)
-    find_D!(sim.grid)
-    viscous_step!(sim.grid, sim.dt)
-    relaxation_step!(sim.grid, sim.dt)
+    find_D!(sim.grid, noslip = false)
+    viscous_step!(sim.grid, sim.dt; artificial_visc = false)
+    relaxation_step!(sim.rx, sim.dt)
     return
 end
 
@@ -85,25 +90,34 @@ function postproc!(sim::Simulation, t::Float64)
     grid = sim.grid
     sim.P_err = 0.0
     sim.v_err = 0.0
-    sim.E_err = -0.5*v_max(sim.Re, t)^2
+    sim.E_err = 0.0
     sim.div = 0.0
+    p_avg = 0.0
+    for p in grid.polygons
+        p_avg += area(p)*p.P
+    end
     for p in grid.polygons
         sim.E_err += p.mass*p.e
         sim.v_err += area(p)*norm_squared(p.v - v_exact(p.x, sim.Re, t))
-        sim.P_err += area(p)*(p.P - P_exact(p.x, sim.Re, t))^2
+        sim.P_err += area(p)*(p.P - p_avg - P_exact(p.x, sim.Re, t))^2
         sim.div += area(p)*(dot(p.D, MAT1)^2)
     end
+    if sim.first_it
+        sim.E0 = sim.E_err
+    end
+    sim.E_err -= sim.E0
     sim.P_err = sqrt(sim.P_err)
     sim.v_err = sqrt(sim.v_err)
     sim.div = sqrt(sim.div)
     @show sim.v_err
     @show sim.P_err
     @show sim.E_err
+    sim.first_it = false
     return
 end
 
-function simple_test(Re::Number, N::Int; structured::Bool = true)
-    sim = Simulation(N, Re, structured)
+function simple_test(Re::Number, N::Int)
+    sim = Simulation(N, Re)
     run!(sim, sim.dt, t_end, step!; 
         postproc! = postproc!,
         nframes = 100, 
@@ -111,15 +125,14 @@ function simple_test(Re::Number, N::Int; structured::Bool = true)
         save_csv = false,
         save_points = false,
         save_grid = true,
-        vtp_vars = (:P, :v, :rho)
+        vtp_vars = (:P, :v, :rho, :quality, :dv)
     )
 end
 
-function get_convergence(Re::Number, structured::Bool)
-    @show structured
+function get_convergence(Re::Number)
     @show Re
     println("***")
-    path = joinpath(export_path, structured ? "ST$(Re)" : "UN$(Re)")
+    path = joinpath(export_path, "$(Re)")
     if !ispath(path)
         mkpath(path)
     end 
@@ -130,7 +143,7 @@ function get_convergence(Re::Number, structured::Bool)
     divs = Float64[]
     for N in Ns
         @show N
-        sim = Simulation(N, Re, structured)
+        sim = Simulation(N, Re)
         run!(sim, sim.dt, t_end, step!; 
             postproc! = postproc!,
             nframes = 5, 
@@ -167,15 +180,15 @@ function linear_regression(x, y)
 end
 
 function main()
-    for structured in (true, false), Re in Res
-        get_convergence(Re, structured)
+    for Re in Res
+        get_convergence(Re)
     end
     makeplots()
     return
 end
 
 function makeplots()
-    rainbow = cgrad(:darkrainbow, 2*length(Res), categorical = true)
+    rainbow = cgrad(:darkrainbow, length(Res), categorical = true)
     shapes = [:circ, :hex, :square, :star4, :star5, :utriangle, :dtriangle, :pentagon, :rtriangle, :ltriangle]
     for var in (:v_errs, :P_errs, :E_errs, :divs)
         myfont = font(12)
@@ -192,8 +205,8 @@ function makeplots()
         ymin = +Inf
         ymax = -Inf
         xmax = -Inf
-        for structured in (true, false), Re in Res
-            label = structured ? "ST$(Re)" : "UN$(Re)"
+        for Re in Res
+            label = "$(Re)"
             path = joinpath(export_path, label, "convergence.csv")
             csv = CSV.read(path, DataFrame)
             y = getproperty(csv, var)
@@ -201,7 +214,7 @@ function makeplots()
             plot!(plt,
                 log10.(x), log10.(y), linestyle = :dot, 
                 markershape = shapes[i], 
-                label = label,
+                label = Re == Inf ? "Re = Inf" : "Re = $(Int(Re))",
                 color = rainbow[i],
             )
             xmax = max(xmax, log10(maximum(x)))

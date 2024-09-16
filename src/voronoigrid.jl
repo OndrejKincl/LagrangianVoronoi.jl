@@ -60,10 +60,10 @@ end
         end
         for i in grid.cell_list.cells[key]
             q = grid.polygons[i]
-            if (poly.x == q.x) || (norm_squared(poly.x-q.x) > prr)
+            y = x + get_arrow(q.x, x, grid)
+            if (x == y) || (norm_squared(x-y) > prr)
                 continue
             end
-            y = poly.x + get_arrow(q.x, poly.x, grid)
             if voronoicut!(poly, y, i)
                 prr = influence_rr(poly)
             end
@@ -90,7 +90,7 @@ end
     return
 end
 
-# get shortest vector from x to y
+# get shortest vector from y to x
 # is equal to x - y on non-periodic domains
 function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)
     v = x - y

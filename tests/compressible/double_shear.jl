@@ -47,6 +47,7 @@ end
     rho::Float64  = 0.0  # density
     v::RealVector = VEC0 # velocity
     e::Float64    = 0.0  # specific energy
+    a::RealVector = VEC0
     
     P::Float64    = 0.0  # pressure
     c2::Float64   = 0.0  # speed of sound squared
@@ -60,6 +61,7 @@ end
     momentum::RealVector = VEC0
     energy::Float64 = 0.0
     phase::Int = 0
+    quality::Float64 = 0.0
 
     vort::Float64 = 0.0 # vorticity
 
@@ -78,12 +80,14 @@ mutable struct Simulation <: SimulationWorkspace
     E0::Float64
     S0::Float64
     first_step::Bool
+    rx::Relaxator{MyPolygon}
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = MyGrid(domain, dr, xperiodic = true, yperiodic = true)
         populate_lloyd!(grid, ic! = ic!)
         solver = CompressibleSolver(grid)
-        return new(grid, solver, 0.0, 0.0, 0.0, 0.0, true)
+        rx = Relaxator(grid)
+        return new(grid, solver, 0.0, 0.0, 0.0, 0.0, true, rx)
     end
 end
 
@@ -108,7 +112,7 @@ function step!(sim::Simulation, t::Float64)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.grid, dt)
+    relaxation_step!(sim.rx, dt)
     return
 end
 

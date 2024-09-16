@@ -91,17 +91,20 @@ end
 
 function multiphase_projection!(rx::Relaxator)
     refresh!(rx)
-    minres!(rx.mr, rx.A, rx.b, atol = 1e-3, rtol = 1e-3, itmax = 20)
-    #stats = statistics(rx.mr)
-    #if stats.solved == false
-        #@warn("multiphase projector failed")
+    minres!(rx.mr, rx.A, rx.b, atol = 1e-4, rtol = 1e-4, itmax = 200)
+    stats = statistics(rx.mr)
+    if stats.solved == false
+        @warn("multiphase projector did not converge within tolerance")
         #return
-    #end
+    end
     y = solution(rx.mr)
     grid = rx.grid
     @batch for i in eachindex(y)
         @inbounds begin
             p = grid.polygons[i]
+            if p.quality < 0.25
+                continue
+            end
             for (q,e) in neighbors(p, grid)
                 if p.phase != q.phase
                     j = e.label
@@ -121,14 +124,28 @@ function relaxation_step!(rx::Relaxator, dt::Float64)
         p.dv = VEC0
         p.momentum = p.mass*p.v
         p.energy = p.mass*p.e
-        #lambda = rx.alpha*norm(p.D)
+        #c = centroid(p)1
+        #cx_dist = norm(c - p.x)
+        #tol = 0.05*sqrt(area(p))
+        #if cx_dist > tol
+        #    p.dv = ((1.0 - tol/cx_dist)/dt)*(c - p.x)
+        #end
         c = centroid(p)
-        cx_dist = norm(c - p.x)
-        tol = 0.05*sqrt(area(p))
-        if cx_dist > tol
-            p.dv = ((1.0 - tol/cx_dist)/dt)*(c - p.x)
+        #r_char = sqrt(area(p))
+        rmax = 0.0
+        rmin = Inf
+        for (q,e) in neighbors(p, grid)
+            pq = get_arrow(p.x,q.x,grid)
+            r = norm(pq)
+            rmax = max(rmax, r)
+            rmin = min(rmin, r)
         end
-        #p.dv = lambda/(1.0 + dt*lambda)*(centroid(p) - p.x)
+        p.quality = rmin/rmax
+        #p.badness = norm(c - p.x)/sqrt(area(p))
+        #lambda = rx.alpha*norm(p.D)
+        lambda = norm(p.D)/(p.quality^2)
+        p.dv = lambda/(1.0 + dt*lambda)*(c - p.x)
+        #p.dv += 0.1*sqrt(area(p))*randn(RealVector)/(p.quality^2)
     end
     if rx.multiprojection
         multiphase_projection!(rx)

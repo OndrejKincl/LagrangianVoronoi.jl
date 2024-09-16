@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (-1.0, 1.0)
 const ylims = (-1.0, 1.0)
-const N = 50 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
 
@@ -67,6 +67,7 @@ mutable struct Simulation <: SimulationWorkspace
     t::Float64
     rho_min::Float64
     P_min::Float64
+    rx::Relaxator{PolygonNSc}
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNSc(domain, dr)
@@ -74,7 +75,8 @@ mutable struct Simulation <: SimulationWorkspace
         populate_hex!(grid, ic! = ic!)
         detonate_bomb!(grid)
         solver = CompressibleSolver(grid)
-        return new(grid, solver, 0.0, 0.0, t_bomb, Inf, Inf)
+        rx = Relaxator(grid)
+        return new(grid, solver, 0.0, 0.0, t_bomb, Inf, Inf, rx)
     end
 end
 
@@ -87,7 +89,7 @@ function step!(sim::Simulation)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.grid, dt, 10.0)
+    relaxation_step!(sim.rx, dt)
     sim.t += dt
     return
 end

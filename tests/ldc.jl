@@ -107,8 +107,8 @@ function compute_fluxes(grid::VoronoiGrid, res = 100)
 end
 
 function make_plot()
-	ref_x2vy = CSV.read("reference/ldc-x2vy.csv", DataFrame)
-	ref_y2vx = CSV.read("reference/ldc-y2vx.csv", DataFrame)
+	ref_x2vy = CSV.read("reference/ldc_x2vy_ghia.csv", DataFrame)
+	ref_y2vx = CSV.read("reference/ldc_y2vx_ghia.csv", DataFrame)
 	propertyname = Symbol("Re", Re)
 	ref_vy = getproperty(ref_x2vy, propertyname)
 	ref_vx = getproperty(ref_y2vx, propertyname)
