@@ -10,19 +10,19 @@ using DataFrames
 using Krylov
 
 include("geometry.jl")
-export RealVector, RealMatrix, VEC0, VECX, VECY, MAT0, MAT1, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts, get_arrow
+export RealVector, RealMatrix, VEC0, VECX, VECY, MAT0, MAT1, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts, midpoint
 
-include("utils/fastvector.jl")
+include("fastvector.jl")
 export FastVector
 
 include("polygon.jl")
 export VoronoiPolygon, area, isboundary, surface_element, normal_vector, centroid, lr_ratio, POLYGON_SIZEHINT, PreAllocVector
 export BDARY_UP, BDARY_RIGHT, BDARY_DOWN, BDARY_LEFT, emptypolygon
 
-include("cell_list.jl")
+include("neighborlist.jl")
 
 include("voronoigrid.jl")
-export VoronoiGrid, remesh!, nearest_polygon
+export VoronoiGrid, remesh!, nearest_polygon, get_arrow
 
 include("IO.jl")
 export export_grid, export_points
@@ -37,60 +37,32 @@ export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral, 
 include("populate.jl")
 export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, populate_hex!, get_mass!
 
-include("utils/threadedvec.jl")
+include("threadedvec.jl")
 export ThreadedVec
 
-include("utils/iterators.jl")
-export neighbors, boundaries, movingavg
+include("iterators.jl")
+export neighbors, boundaries
 
-include("utils/newtonlloyd.jl")
-export newtonlloyd!
+include("simulation.jl")
+export SimulationWorkspace, run!, movingavg
 
-include("utils/run.jl")
-export SimulationWorkspace, run!
+include("celldefs.jl")
+export GridNS, PolygonNS, GridNSF, PolygonNSF
 
-include("utils/lrrcache.jl")
-export Lrr_cache, new_lrr_cache, refresh!
+include("move.jl")
+export move!
 
-include("NavierStokes/definitions.jl")
-export GridNS, PolygonNS
+include("pressure.jl")
+export pressure_step!, ideal_eos!, stiffened_eos!, gravity_step!, PressureOperator, PressureSolver, find_pressure!
 
-include("NavierStokes/physics.jl")
-export move!, pressure_force!, viscous_force!
-
-include("NavierStokes/psolver.jl")
-export PressureSolver, find_pressure!
-
-include("compressible/definitions.jl")
-export GridNSc, PolygonNSc, GridNSFc, PolygonNSFc
-
-include("compressible/psolver.jl")
-export CompressibleOperator, CompressibleSolver, find_pressure!
-
-include("compressible/pressure.jl")
-export pressure_step!, ideal_eos!, stiffened_eos!, gravity_step!
-
-include("compressible/diffusion.jl")
+include("diffusion.jl")
 export find_D!, viscous_step!
 
-include("compressible/relaxation.jl")
-export Relaxator, relaxation_step!
+include("relaxation.jl")
+export find_dv!, relaxation_step!, MultiphaseSolver, multiphase_projection!
 
-include("compressible/fourier.jl")
+include("fourier.jl")
 export ideal_temperature!, fourier_step!, fourier_dirichlet_bc!
-
-include("muscl/definitions.jl")
-export PolygonMUSCL, GridMUSCL
-
-include("muscl/reconstruction.jl")
-export reconstruction!, get_intensives!
-
-include("muscl/physical_step.jl")
-export ideal_gas_law, physical_step!, update!
-
-include("muscl/timestepping.jl")
-export RK2_step!
-
 
 
 

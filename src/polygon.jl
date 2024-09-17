@@ -169,8 +169,8 @@ function centroid(p::VoronoiPolygon)::RealVector
     return c/A
 end
 
-function lr_ratio(p::VoronoiPolygon, q::VoronoiPolygon, e::Edge)::Float64
+function lr_ratio(dx::RealVector, e::Edge)::Float64
     l2 = norm_squared(e.v1 - e.v2)
-    r2 = norm_squared(p.x - q.x)
+    r2 = norm_squared(dx)
     return sqrt(l2/r2)
 end

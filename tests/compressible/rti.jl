@@ -20,14 +20,14 @@ const gamma = 1.4
 const xlims = (0.0, 1.0)
 const ylims = (0.0, 2.0)
 
-const N = 200 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 const h = 2*dr
 
 const v_char = 1.0
 const l_char = 1.0
 const dt = 0.1*dr/v_char
-const t_end =  5.0
+const t_end =  10*dt #5.0
 const nframes = 400
 
 const export_path = "results/rtiN$(N)"
@@ -52,16 +52,15 @@ end
 
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
-    solver::CompressibleSolver{PolygonNSc}
-    rx::Relaxator{PolygonNSc}
+    grid::GridNS
+    psolver::PressureSolver{PolygonNS}
+    msolver::MultiphaseSolver{PolygonNS}
     E::Float64
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr)
-        rx = Relaxator(grid)
+        grid = GridNS(domain, dr)
         populate_lloyd!(grid, ic! = ic!)
-        return new(grid, CompressibleSolver(grid), rx, 0.0)
+        return new(grid, PressureSolver(grid), MultiphaseSolver(grid), 0.0)
     end
 end
 
@@ -69,11 +68,13 @@ function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
     gravity_step!(sim.grid, -g*VECY, dt)
     ideal_eos!(sim.grid)
-    find_pressure!(sim.solver, dt)
+    find_pressure!(sim.psolver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid, noslip = true)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.rx, dt)
+    find_dv!(sim.grid, dt)
+    multiphase_projection!(sim.msolver)
+    relaxation_step!(sim.grid, dt)
     return
 end
 

@@ -160,3 +160,19 @@ function nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T where T <: Voro
     end
     return grid.polygons[i_best]
 end
+
+function periodic_proj(grid::VoronoiGrid, Z::RealVector)::RealVector
+    Zx = Z[1]
+    Zy = Z[2]
+    if grid.xperiodic
+        xperiod = abs(grid.boundary_rect.xmax[1] - grid.boundary_rect.xmin[1])
+        Zx = (Z[1] - grid.boundary_rect.xmin[1])%xperiod
+        Zx = (Zx + xperiod)%xperiod + grid.boundary_rect.xmin[1]
+    end
+    if grid.yperiodic   
+        yperiod = abs(grid.boundary_rect.xmax[2] - grid.boundary_rect.xmin[2])
+        Zy = (Z[2] - grid.boundary_rect.xmin[2])%yperiod
+        Zy = (Zy + yperiod)%yperiod + grid.boundary_rect.xmin[2]
+    end
+    return Zx*VECX + Zy*VECY
+end

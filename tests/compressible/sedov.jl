@@ -13,7 +13,7 @@ using .LagrangianVoronoi
 const rho0 = 1.0
 const xlims = (-1.0, 1.0)
 const ylims = (-1.0, 1.0)
-const N = 100 #resolution
+const N = 50 #resolution
 const dr = 1.0/N
 
 
@@ -27,7 +27,7 @@ const c0 = sqrt(gamma*P0/rho0)  # sound speed
 const r_bomb = 0.05
 const E_bomb = 0.3
 const t_bomb = sqrt(rho0/E_bomb*r_bomb^5)
-const t_end = 1.0
+const t_end = 0.1 # 1.0
 const CFL = 0.1
 
 
@@ -60,23 +60,21 @@ function detonate_bomb!(grid::VoronoiGrid)
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
-    solver::CompressibleSolver
+    grid::GridNS
+    solver::PressureSolver
     E::Float64
     S::Float64
     t::Float64
     rho_min::Float64
     P_min::Float64
-    rx::Relaxator{PolygonNSc}
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr)
+        grid = GridNS(domain, dr)
         #populate_circ!(grid)
         populate_hex!(grid, ic! = ic!)
         detonate_bomb!(grid)
-        solver = CompressibleSolver(grid)
-        rx = Relaxator(grid)
-        return new(grid, solver, 0.0, 0.0, t_bomb, Inf, Inf, rx)
+        solver = PressureSolver(grid)
+        return new(grid, solver, 0.0, 0.0, t_bomb, Inf, Inf)
     end
 end
 
@@ -84,12 +82,13 @@ function step!(sim::Simulation)
     v_shock = 0.4*sim.t^(-0.6)*(E_bomb/rho0)^0.2
     dt = CFL*dr/(sqrt(6.0)*v_shock)
     move!(sim.grid, dt)
-    ideal_eos!(sim.grid, gamma, P0)
+    ideal_eos!(sim.grid, gamma; Pmin = P0)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.rx, dt)
+    find_dv!(sim.grid, dt)
+    relaxation_step!(sim.grid, dt)
     sim.t += dt
     return
 end

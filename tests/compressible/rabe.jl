@@ -20,12 +20,12 @@ const c0 = sqrt(gamma*P0/rho0)
 const Tu = P0/(rho0*R) #temperature of upper boundary (cooler)
 const Td = 1000.0 #30.0 #Tu*(1.0 + contrast) #temperature of lower boundary (heater)
 
-const export_path = "results/rabe2"
+const export_path = "results/rabe_test"
 const dr = H/150
 const v_char = 2.0
 const dt = 0.1*dr/v_char
 const nframes = 400
-const t_end = 2.0
+const t_end = 10*dt #2.0
 
 function print_info()
     @show Tu
@@ -120,20 +120,18 @@ function enforce_bc!(grid::VoronoiGrid, dt::Float64, T_bc::Function)
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSFc
-    solver::CompressibleSolver{PolygonNSFc}
+    grid::GridNSF
+    solver::PressureSolver{PolygonNSF}
     E::Float64
     S::Float64
     E_kinetic::Float64
-    rx::Relaxator{PolygonNSFc}
     Simulation() = begin
         xlims = (0.0, W)
         ylims = (0.0, H)
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSFc(domain, dr)
+        grid = GridNSF(domain, dr)
         populate_lloyd!(grid, ic! = exp_atmo!)
-        rx = Relaxator(grid)
-        return new(grid, CompressibleSolver(grid), 0.0, 0.0, 0.0, rx)
+        return new(grid, PressureSolver(grid), 0.0, 0.0, 0.0)
     end
 end
 
@@ -148,7 +146,8 @@ function step!(sim::Simulation, t::Float64)
     enforce_bc!(sim.grid, dt, T_bc)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.rx, dt)
+    find_dv!(sim.grid, dt)
+    relaxation_step!(sim.grid, dt)
     return
 end
 

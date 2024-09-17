@@ -1,6 +1,6 @@
 # Gresho Vortex Benchmark
 
-module threephase
+module triplepoint
 
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters, Polyester
 using SmoothedParticles:rDwendland2
@@ -36,9 +36,9 @@ const CFL = 0.1
 const v_char = 1.5
 const dt = CFL*dr/v_char
 
-const t_end = 3.0
+const t_end = 10*dt #3.0
 
-const export_path = "results/three_phase3"
+const export_path = "results/triplepoint"
 
 # enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
@@ -67,34 +67,36 @@ function multi_eos!(grid::VoronoiGrid)
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
-    solver::CompressibleSolver
+    grid::GridNS
+    psolver::PressureSolver
+    msolver::MultiphaseSolver
     E::Float64
     S::Float64
     E0::Float64
     S0::Float64
     quality::Float64
     first_step::Bool
-    rx::Relaxator{PolygonNSc}
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr)
+        grid = GridNS(domain, dr)
         populate_hex!(grid, ic! = ic!)
         #populate_lloyd!(grid, ic! = ic!)
-        solver = CompressibleSolver(grid)
-        rx = Relaxator(grid; multiprojection = true)
-    return new(grid, solver, 0.0, 0.0, 0.0, 0.0, 0.0, true, rx)
+        psolver = PressureSolver(grid)
+        msolver = MultiphaseSolver(grid)
+    return new(grid, psolver, msolver, 0.0, 0.0, 0.0, 0.0, 0.0, true)
     end
 end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
     multi_eos!(sim.grid)
-    find_pressure!(sim.solver, dt)
+    find_pressure!(sim.psolver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid, noslip = false)
     viscous_step!(sim.grid, dt)
-    relaxation_step!(sim.rx, dt)
+    find_dv!(sim.grid, dt)
+    multiphase_projection!(sim.msolver)
+    relaxation_step!(sim.grid, dt)
     return
 end
 

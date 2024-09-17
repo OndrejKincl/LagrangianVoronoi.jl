@@ -10,13 +10,14 @@ function neighbors(p::T, grid::VoronoiGrid{T})::PolygonNeighborIterator{T} where
     return PolygonNeighborIterator{T}(p, grid)
 end
 
-function Base.iterate(itr::PolygonNeighborIterator, i::Int = 0)::Union{Nothing, Tuple{Tuple{VoronoiPolygon, Edge}, Int}}
+function Base.iterate(itr::PolygonNeighborIterator, i::Int = 0)::Union{Nothing, Tuple{Tuple{VoronoiPolygon, Edge, RealVector}, Int}}
     while (i < length(itr.p.edges))
         i += 1
         e = itr.p.edges[i]
         if isboundary(e) continue end
         q = itr.grid.polygons[e.label]
-        return ((q, e), i)
+        y = itr.p.x + get_arrow(q.x, itr.p.x, itr.grid)
+        return ((q, e, y), i)
     end
     return nothing
 end
@@ -38,21 +39,4 @@ function Base.iterate(itr::PolygonBoundaryIterator, i::Int = 0)::Union{Nothing, 
         return (e, i)
     end
     return nothing
-end
-
-function movingavg(x::AbstractVector, radius::Integer=1)
-    y = similar(x)
-    len = length(x)
-    for i in eachindex(x)
-        lo = max(i-radius, 1)
-        hi = min(i+radius, len)
-        nsummands = 0
-        y[i] = zero(eltype(x))
-        for j in lo:hi
-            y[i] += x[j]
-            nsummands += 1
-        end
-        y[i] /= nsummands
-    end
-    return y
 end

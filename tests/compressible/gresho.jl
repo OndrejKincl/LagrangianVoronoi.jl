@@ -13,18 +13,19 @@ const l_char = 0.4
 const rho0 = 1.0
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 200 #resolution
+const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.1*dr/v_char
-const t_end =  3.0
+const t_end =  0.5
 const nframes = 100
 
 const c0 = 1.0
 const gamma = 1.4
+const stiffened = (c0 > 100.0)
 const P0 = rho0*c0^2/gamma
 
-const export_path = "results/gresho/norelax"
+const export_path = "results/gresho/test"
 
 # exact solution and initial velocity
 function v_exact(x::RealVector)::RealVector
@@ -37,10 +38,11 @@ function v_exact(x::RealVector)::RealVector
 end
 
 function P_exact(x::RealVector)::Float64
+    Pmin = (stiffened ? 0.0 : P0)
     return @match norm(x) begin
-        r, if r < 0.2 end => P0 + 12.5*r^2
-        r, if r < 0.4 end => P0 + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
-        _ => P0 - 2.0 + 4*log(2)
+        r, if r < 0.2 end => Pmin + 12.5*r^2
+        r, if r < 0.4 end => Pmin + 4.0 + 4*log(5*r) - 20.0*r + 12.5*r^2
+        _ => Pmin - 2.0 + 4*log(2)
     end
 end
 
@@ -54,26 +56,31 @@ function ic!(p::VoronoiPolygon)
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
-    solver::CompressibleSolver{PolygonNSc}
+    grid::GridNS
+    solver::PressureSolver{PolygonNS}
     E::Float64
     l2_err::Float64
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr)
+        grid = GridNS(domain, dr)
         populate_circ!(grid, ic! = ic!)
-        return new(grid, CompressibleSolver(grid), 0.0, 0.0)
+        return new(grid, PressureSolver(grid), 0.0, 0.0)
     end
 end
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
-    ideal_eos!(sim.grid, gamma)
+    if stiffened
+        stiffened_eos!(sim.grid, gamma, P0)
+    else
+        ideal_eos!(sim.grid, gamma)
+    end
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
-    #relaxation_step!(sim.grid, dt)
+    find_dv!(sim.grid, dt)
+    relaxation_step!(sim.grid, dt)
     return
 end
 
@@ -158,13 +165,10 @@ function plot_midline_all_Mach()
         linewidth = 1.0,
     )
     plot_y = [Ma0001.vy Ma001.vy Ma01.vy Ma1.vy Ma100.vy]
-    #plot_y = (plot_y .- Ma1.vy_exact)
     plot!(plt,
         Ma1.x,
         plot_y,
         label = ["Ma = 0.001" "Ma = 0.01" "Ma = 0.1" "Ma = 1" "Ma = 100"],
-        #markershape = :hex,
-        #markersize = 2,
         linewidth = 1.0,
         color = [:blue :red :darkgreen :purple :orange],
         markershape = [:hex :circ :star7 :utriangle :dtriangle]

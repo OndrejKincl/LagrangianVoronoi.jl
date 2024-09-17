@@ -50,13 +50,12 @@ mutable struct Simulation <: SimulationWorkspace
     dr::Float64
     dt::Float64
     Re::Float64
-    grid::GridNSc
-    solver::CompressibleSolver{PolygonNSc}
+    grid::GridNS
+    solver::PressureSolver{PolygonNS}
     v_err::Float64
     P_err::Float64
     E_err::Float64
     div::Float64
-    rx::Relaxator{PolygonNSc}
     first_it::Bool
     E0::Float64
     Simulation(N::Int, Re::Number) = begin
@@ -64,13 +63,12 @@ mutable struct Simulation <: SimulationWorkspace
         dr = 1.0/N
         dt = 0.1*min(dr, dr^2*Re)
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSc(domain, dr, xperiodic = true, yperiodic = true)
+        grid = GridNS(domain, dr, xperiodic = true, yperiodic = true)
         populate_hex!(grid)
         _ic! = (p -> ic!(p, Re))
         apply_unary!(grid, _ic!)
-        solver = CompressibleSolver(grid)
-        rx = Relaxator(grid)
-        return new(dr, dt, Re, grid, solver, 0.0, 0.0, 0.0, 0.0, rx, true, 0.0)
+        solver = PressureSolver(grid)
+        return new(dr, dt, Re, grid, solver, 0.0, 0.0, 0.0, 0.0, true, 0.0)
     end
 end
 
@@ -80,8 +78,9 @@ function step!(sim::Simulation, t::Float64)
     find_pressure!(sim.solver, sim.dt)
     pressure_step!(sim.grid, sim.dt)
     find_D!(sim.grid, noslip = false)
-    viscous_step!(sim.grid, sim.dt; artificial_visc = false)
-    relaxation_step!(sim.rx, sim.dt)
+    viscous_step!(sim.grid, sim.dt; artificial_viscosity = false)
+    find_dv!(sim.grid, sim.dt)
+    relaxation_step!(sim.grid, sim.dt)
     return
 end
 

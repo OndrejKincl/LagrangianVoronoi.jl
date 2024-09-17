@@ -51,6 +51,14 @@ function len(e::Edge)::Float64
     return norm(e.v1 - e.v2)
 end
 
+function midpoint(e::Edge)::RealVector
+    return 0.5*(e.v1 + e.v2)
+end
+
+function midpoint(x::RealVector, y::RealVector)::RealVector
+    return 0.5*(x + y)
+end
+
 function norm_squared(x::RealVector)::Float64
     return dot(x, x)
 end

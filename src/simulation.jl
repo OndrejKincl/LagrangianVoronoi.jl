@@ -65,3 +65,20 @@ function run!(sim::SimulationWorkspace, dt::Float64, t_end::Float64, step!::Func
     save_csv && CSV.write(string(path, "/simdata.csv"), DataFrame(csv_data)) 
     return   
 end
+
+function movingavg(x::AbstractVector, radius::Integer=1)
+    y = similar(x)
+    len = length(x)
+    for i in eachindex(x)
+        lo = max(i-radius, 1)
+        hi = min(i+radius, len)
+        nsummands = 0
+        y[i] = zero(eltype(x))
+        for j in lo:hi
+            y[i] += x[j]
+            nsummands += 1
+        end
+        y[i] /= nsummands
+    end
+    return y
+end

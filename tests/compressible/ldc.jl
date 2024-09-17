@@ -12,8 +12,8 @@ const Re = 1000 # Reynolds number
 const N = 100 # resolution
 const dr = 1.0/N
 const dt = min(0.1*dr, 0.1*Re*dr^2)
-const t_end = 0.1*Re
-const export_path = "results/ldc/Re$(Re)"
+const t_end = 10*dt #0.1*Re
+const export_path = "results/ldc/test"
 
 const rho0 = 1.0
 const c0 = 1000.0
@@ -52,17 +52,15 @@ function bdary_friction!(grid::VoronoiGrid, dt::Float64)
 end
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSc
+    grid::GridNS
     mesh_quality::Float64
     energy::Float64
-    solver::CompressibleSolver{PolygonNSc}
-    rx::Relaxator{PolygonNSc}
+    solver::PressureSolver{PolygonNS}
     Simulation() = begin
         domain = UnitRectangle()
-        grid = GridNSc(domain, dr)
+        grid = GridNS(domain, dr)
         populate_lloyd!(grid, ic! = ic!)
-        rx = Relaxator(grid)
-        return new(grid, 0.0, 0.0, CompressibleSolver(grid), rx)
+        return new(grid, 0.0, 0.0, PressureSolver(grid))
     end
 end
 
@@ -72,9 +70,10 @@ function step!(sim::Simulation, t::Float64)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
     find_D!(sim.grid, noslip = false)
-    LagrangianVoronoi.viscous_step_legacy!(sim.grid, dt)
+    viscous_step!(sim.grid, dt; artificial_viscosity = false)
     bdary_friction!(sim.grid, dt)
-    relaxation_step!(sim.rx, dt)
+    find_dv!(sim.grid, dt)
+    relaxation_step!(sim.grid, dt)
     return
 end
 
