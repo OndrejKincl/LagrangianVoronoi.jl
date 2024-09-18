@@ -6,7 +6,7 @@ using WriteVTK, LinearAlgebra, Random, Match,  Parameters, Polyester
 using SmoothedParticles:rDwendland2
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
-include("../../src/LagrangianVoronoi.jl")
+include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 

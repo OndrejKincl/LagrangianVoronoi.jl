@@ -1,5 +1,5 @@
 module rabe #Rayleigh-Bénard instability
-include("../../src/LagrangianVoronoi.jl")
+include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 using Match, Polyester, LinearAlgebra, WriteVTK
 

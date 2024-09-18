@@ -121,11 +121,19 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     b = solver.b
     P = solver.P
     GP = solver.GP
+    # find mean pressure
+    P_mean = 0.0
+    @batch for p in grid.polygons
+        P_mean += p.P
+    end
+    P_mean /= length(grid.polygons)
     @batch for i in eachindex(grid.polygons)
         @inbounds begin
             p = grid.polygons[i]
             b[i] = p.mass*p.P/(p.rho^2*p.c2*dt^2)
-            P[i] = p.P # serves as an initial guess
+            # serves as an initial guess
+            # substracting the mean value is good for incompressible case
+            P[i] = p.P - P_mean 
             GP[i] = VEC0
             for (q,e,y) in neighbors(p, grid)
                 lrr = lr_ratio(p.x-y,e)

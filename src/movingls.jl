@@ -39,14 +39,15 @@ function movingls(
         end
         for i in grid.cell_list.cells[key]
             q = grid.polygons[i]
-            if (p.x == q.x)
+            y = p.x + get_arrow(q.x, p.x, grid)
+            if (p.x == y)
                 continue
             end
-            r = norm(p.x - q.x)
+            r = norm(p.x-y)
             if r < h
                 ker = kernel(h, r)
                 fq = fun(q)
-                dx = power_vector(T, q.x - p.x)
+                dx = power_vector(T, y - p.x)
                 a += ker*(fq - fp)*dx
                 R += ker*dx*dx'
             end

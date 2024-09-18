@@ -5,7 +5,7 @@ module ldc
 using LaTeXStrings, DataFrames, CSV, Plots, Measures, Polyester, LinearAlgebra
 
 
-include("../../src/LagrangianVoronoi.jl")
+include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const Re = 1000 # Reynolds number
@@ -127,8 +127,8 @@ function compute_fluxes(grid::VoronoiGrid, res = 100)
 end
 
 function make_plot()
-	ref_x2vy = CSV.read("../reference/ldc_x2vy_abdelmigid.csv", DataFrame)
-	ref_y2vx = CSV.read("../reference/ldc_y2vx_abdelmigid.csv", DataFrame)
+	ref_x2vy = CSV.read("reference/ldc_x2vy_abdelmigid.csv", DataFrame)
+	ref_y2vx = CSV.read("reference/ldc_y2vx_abdelmigid.csv", DataFrame)
 	propertyname = Symbol("Re", Re)
 	ref_vy = getproperty(ref_x2vy, propertyname)
 	ref_vx = getproperty(ref_y2vx, propertyname)

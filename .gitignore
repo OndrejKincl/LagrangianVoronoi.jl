@@ -7,3 +7,4 @@
 *.jpg
 *.mem
 trash
+tests/results_archive.tar.gz

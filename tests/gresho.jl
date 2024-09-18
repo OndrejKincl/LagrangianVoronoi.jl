@@ -5,7 +5,7 @@ module gresho
 using WriteVTK, LinearAlgebra, Random, Match,  Parameters
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
-include("../../src/LagrangianVoronoi.jl")
+include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const v_char = 1.0
@@ -20,12 +20,12 @@ const dt = 0.1*dr/v_char
 const t_end =  0.5
 const nframes = 100
 
-const c0 = 1.0
+const c0 = Inf
 const gamma = 1.4
 const stiffened = (c0 > 100.0)
 const P0 = rho0*c0^2/gamma
 
-const export_path = "results/gresho/test"
+const export_path = "results/gresho/incompressible"
 
 # exact solution and initial velocity
 function v_exact(x::RealVector)::RealVector

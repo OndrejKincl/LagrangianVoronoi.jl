@@ -5,14 +5,14 @@ using SmoothedParticles:rDwendland2
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
 
-include("../../src/LagrangianVoronoi.jl")
+include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
 const ylims = (0.0, 1.0)
 const mu = 2e-4
-const dr = 1e-2 #5e-3
+const dr = 5e-3
 const gamma = 1.4
 const P0 = 100.0/gamma
 

@@ -37,7 +37,7 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool=true)
 
             if rusanov
                 # Rusanov riemann solver for pure advection
-                # this term helps with entropy and for not creating new extremal points
+                # this term helps with entropy growth and against new extrema generation
                 a = max(norm(p.dv), norm(q.dv))
                 l = len(e)
                 p.mass += 0.5*dt*l*a*(q.rho - p.rho)
