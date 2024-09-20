@@ -1,3 +1,14 @@
+"""
+    find_dv!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 1.0)
+
+Determine `dv`, the repair velocity. This is the first step of mesh relaxation procedure and
+is needed to maintain sufficiently high mesh quality. The repair velocity is chosen to be proportional to Frobenius norm of velocity deformation tensor `D` and inversely
+proportional to the mesh quality squared. There is also multiplicative dimensionless
+parameter `alpha` with default value `alpha = 1`. Higher `alpha` causes the Voronoi cells
+to be rounder (= better) but also less genuinly Lagrangian.
+
+Required variables in Voronoi Polygon: `dv`, `D`, `quality`.
+"""
 function find_dv!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 1.0)
     @batch for p in grid.polygons
         p.dv = VEC0
@@ -15,7 +26,18 @@ function find_dv!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 1.0)
     end
 end
 
-function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool=true)
+"""
+    relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
+
+Update the generating seeds using the repair velocity `dv`. The repair velocity should be known
+before the `relalaxation_step!` is called. See `find_dv!`. The mass, momentum and energy of each cell
+is updated by solving one step of an advection problem. A keyword boolean argument `rusanov` controls the use of a
+Rusanov approximate Riemann solver. The Rusanov flux is recommended to prevent the generation of new extrema (like negative density) and decrease of entropy.
+This is a second step of the mesh relaxation procedure (or maybe third, if your simulation involves a multiphase projector).
+
+Required variables: `dv`, `v`, `e`, `mass`, `momentum`, `energy`, `phase`.
+"""
+function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
     @batch for p in grid.polygons
         p.momentum = p.mass*p.v
         p.energy = p.mass*p.e
@@ -51,10 +73,14 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool=true)
         p.e = p.energy/p.mass
         p.x += dt*p.dv
     end
-    #remesh!(grid)
+    remesh!(grid)
 end
 
+"""
+    MultiphaseProjector(grid::VoronoiGrid)
 
+A linear operator which appears in the multiphase projection system. It is symmetric and positive-definite.
+"""
 struct MultiphaseProjector{T}
     n::Int
     grid::VoronoiGrid{T}
@@ -105,6 +131,13 @@ Base.eltype(::MultiphaseProjector) = Float64
 Base.size(A::MultiphaseProjector) = (A.n, A.n)
 Base.size(A::MultiphaseProjector, i::Int) = (i <= 2 ? A.n : 0)
 
+"""
+    MultiphaseSolver(grid::VoronoiGrid, quality_threshold::Float64 = 0.25)
+
+Construct a solver for the multiphase projection step. 
+A keyword argument `quality_threshold` determines when `dv` should not be projected because the quality of the cell is too poor.
+In these problematic cases, stability of the simulation takes priority over physical accuracy. 
+"""
 struct MultiphaseSolver{T}
     n::Int
     grid::VoronoiGrid{T}
@@ -112,14 +145,14 @@ struct MultiphaseSolver{T}
     b::ThreadedVec{Float64}
     q::ThreadedVec{Float64}
     mr::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
-    quality_treshold::Float64
-    MultiphaseSolver(grid::VoronoiGrid{T}, quality_treshold::Float64 = 0.25) where T <: VoronoiPolygon = begin
+    quality_threshold::Float64
+    MultiphaseSolver(grid::VoronoiGrid{T}; quality_threshold::Float64 = 0.25) where T <: VoronoiPolygon = begin
         n = length(grid.polygons)
         A = MultiphaseProjector(grid)
         b = ThreadedVec{Float64}(undef, n)
         q = ThreadedVec{Float64}(undef, n)
         mr = MinresSolver(A, b)
-        return new{T}(n, grid, A, b, q, mr, quality_treshold)
+        return new{T}(n, grid, A, b, q, mr, quality_threshold)
     end
 end
 
@@ -140,6 +173,16 @@ function refresh!(solver::MultiphaseSolver)
     end
 end
 
+"""
+    multiphase_projection!(solver::MultiphaseSolver)
+
+Solve the linear system to find an orthogonal projection of `dv` to a constraint space
+which gurantees conservation of area for every fluid phase. You only need this for multiphase flows.
+You can also run multiphase problems without it but expect some artificial density ridges between
+phases of different densities.
+
+Required variables: `dv`, `phase`, `quality`.
+"""
 function multiphase_projection!(solver::MultiphaseSolver)
     refresh!(solver)
     minres!(solver.mr, solver.A, solver.b, atol = 1e-4, rtol = 1e-4, itmax = 200)
@@ -153,7 +196,7 @@ function multiphase_projection!(solver::MultiphaseSolver)
     @batch for i in eachindex(res)
         @inbounds begin
             p = grid.polygons[i]
-            if p.quality < solver.quality_treshold
+            if p.quality < solver.quality_threshold
                 continue
             end
             for (q,e,y) in neighbors(p, grid)

@@ -1,7 +1,13 @@
 import Base: eltype, size
 import LinearAlgebra: mul!
 
-# update velocity by pressure gradient
+"""
+    pressure_step!(grid::VoronoiGrid, dt::Float64)  
+
+Update the velocity and energy by the pressure field. This assumes that pressure was already determined.
+
+Required variables: `v`, `e`, `P`, `mass`.
+"""
 function pressure_step!(grid::VoronoiGrid, dt::Float64)  
     @batch for p in grid.polygons
         for (q,e,y) in neighbors(p, grid)
@@ -19,12 +25,26 @@ function pressure_step!(grid::VoronoiGrid, dt::Float64)
     end
 end
 
-# internal energy
+"""
+    eint(p::VoronoiPolygon)::Float64 
+
+Return the internal energy of a Voronoi Polygon.
+
+Required variables: `v`, `e`.
+"""
 function eint(p::VoronoiPolygon)::Float64 
     return p.e - 0.5*norm_squared(p.v)
 end
 
-# ideal gas equation of state
+"""
+    ideal_eos!(grid::VoronoiGrid, gamma = 1.4; Pmin) 
+
+Compute pressure and sound speed from internal energy and density using ideal gas equation of state.
+Number `gamma` is adiabatic index and `Pmin` can specify least possible value pressure.
+In the semi-implicit scheme, this value of pressure is used as an initial condition for an implicit solver.
+
+Required variables: `v`, `e`, `P`, `rho`, `mass`.
+"""
 function ideal_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4; Pmin::Float64 = 0.0) 
     @batch for p in grid.polygons
         p.rho = p.mass/area(p)
@@ -33,7 +53,15 @@ function ideal_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4; Pmin::Float64 = 0.0
     end
 end
 
-# stiffened gas equation of state
+"""
+    stiffened_eos!(grid::VoronoiGrid, gamma = 1.4; P0) 
+
+Compute pressure and sound speed from internal energy and density using ideal gas equation of state.
+Number `gamma` is adiabatic index and `P0` is the stiffness constant.
+Stiffened equation of state fares better for flows with very low Mach number.
+
+Required variables: `v`, `e`, `P`, `rho`, `mass`.
+"""
 function stiffened_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4, P0::Float64 = 0.0)
     @batch for p in grid.polygons
         p.rho = p.mass/area(p)
@@ -42,6 +70,13 @@ function stiffened_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4, P0::Float64 = 0
     end
 end
 
+"""
+    gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
+
+Update velocity field and specific energy by a gravitational force.
+
+Required variables: `v`, `e`.
+"""
 function gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
     @batch for p in grid.polygons
         p.v += dt*g
@@ -49,21 +84,26 @@ function gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
     end
 end
 
-# Operator for the pressure system
+"""
+    PressureOperator(grid::VoronoiGrid)
+
+Construct the operator for pressure system. It is symmetric and positive-definite.
+""" 
 struct PressureOperator{T}
     n::Int
-    neighbors::Vector{Vector{Int}}
-    lr_ratios::Vector{Vector{Float64}}
+    neighbors::Vector{FastVector{Int}}
+    lr_ratios::Vector{FastVector{Float64}}
     diagonal::Vector{Float64}
     PressureOperator(grid::VoronoiGrid{T}) where T <: VoronoiPolygon = begin
         n = length(grid.polygons)
-        neighbors = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:n]
-        lr_ratios = [PreAllocVector(Float64, POLYGON_SIZEHINT) for _ in 1:n]
+        neighbors = [FastVector{Int}(POLYGON_SIZEHINT) for _ in 1:n]
+        lr_ratios = [FastVector{Float64}(POLYGON_SIZEHINT) for _ in 1:n]
         diagonal = [1.0 for _ in 1:n]
         return new{T}(n, neighbors, lr_ratios, diagonal)
     end
 end
 
+# Update the pressure operator when the mesh or physical field change.
 function refresh!(A::PressureOperator, grid::VoronoiGrid, dt::Float64)
     @batch for i in 1:A.n
         begin
@@ -97,6 +137,11 @@ Base.eltype(::PressureOperator) = Float64
 Base.size(A::PressureOperator) = (A.n, A.n)
 Base.size(A::PressureOperator, i::Int) = (i <= 2 ? A.n : 0)
 
+"""
+    PressureSolver(grid::VoronoiGrid; verbose::Bool)
+
+Construct the solver for pressure system.
+""" 
 struct PressureSolver{T}
     A::PressureOperator{T}
     b::ThreadedVec{Float64}
@@ -105,7 +150,7 @@ struct PressureSolver{T}
     ms::MinresSolver{Float64, Float64, ThreadedVec{Float64}}
     grid::VoronoiGrid{T}
     verbose::Bool
-    PressureSolver(grid::VoronoiGrid{T}; verbose = false) where T <: VoronoiPolygon = begin
+    PressureSolver(grid::VoronoiGrid{T}; verbose::Bool = false) where T <: VoronoiPolygon = begin
         n = length(grid.polygons)
         A = PressureOperator(grid)
         b = ThreadedVec{Float64}(undef, n)
@@ -116,6 +161,7 @@ struct PressureSolver{T}
     end
 end
 
+# Update the pressure solver when the mesh or physical field change.
 function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     grid = solver.grid
     b = solver.b
@@ -162,6 +208,14 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     end
 end
 
+"""
+    find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64)
+
+Find the estimated value of pressure field at the next time step. 
+Integer `niter` is the number fixed point iteratrions.
+
+Required variables in Voronoi Polygon: `v`, `P`, `mass`, `rho`, `c2`.
+""" 
 function find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64 = 5)
     refresh!(solver.A, solver.grid, dt)
     for it in 1:niter

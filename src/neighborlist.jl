@@ -43,6 +43,7 @@ mutable struct CellList
     end
 end
 
+# Return the Cartesian index of cell which contains x.
 @inline function findkey(list::CellList, x::RealVector)::Key
 	x = x - list.origin
     @inbounds i1 = floor(Int, x[1]/list.h) + 1
@@ -50,6 +51,7 @@ end
 	return Key(i1, i2)
 end
 
+# Insert the label into the cell list. The cell is determined by x. 
 @inbounds function insert!(list::CellList, x::RealVector, label::Int)::Bool
     key = findkey(list, x)
     if checkbounds(Bool, list.cells, key)

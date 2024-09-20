@@ -1,7 +1,10 @@
-# implementation of a pre-allocated vector 
-# compared to normal vector, this improves performance by ~50%
-# if this is already implemented somewhere, pls let me know
+"""
+    FastVector{T} <: AbstractVector{T}
 
+A vector with preallocated memory than can only increase in size.
+Compared to normal vector, this improves the performance of mesh generation by about 50%.
+If this is already implemented somewhere, please let me know.
+"""
 mutable struct FastVector{T} <: AbstractVector{T}
     data::Vector{T}
     last::Int

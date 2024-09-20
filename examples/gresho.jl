@@ -17,7 +17,7 @@ const N = 100 #resolution
 const dr = 1.0/N
 
 const dt = 0.1*dr/v_char
-const t_end =  0.5
+const t_end =  10*dt
 const nframes = 100
 
 const c0 = Inf

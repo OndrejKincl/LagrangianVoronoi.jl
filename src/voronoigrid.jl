@@ -1,3 +1,16 @@
+"""
+    VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64, kwargs...)
+
+This struct contains all information about geometry, the Voronoi mesh and a cell list. 
+Type variable `T` specifies the Voronoi Polygon, `boundary_rect` defines the computational domain and `dr` is the default resolution 
+(a particle will typically occupy an area of size `dr^2`). 
+
+Keyword arguments:
+* `xperiodic::Bool`: Is our domain periodic in the horizontal direction?
+* `yperiodic::Bool`: Is our domain periodic in the vertical direction?
+* `h` the size of cells in the cell_list
+* `r_max` the maximum possible distance between neighboring cells
+"""
 mutable struct VoronoiGrid{T}
     dr::Float64
     h::Float64
@@ -6,23 +19,20 @@ mutable struct VoronoiGrid{T}
     extended_rect::Rectangle
     cell_list::CellList
     polygons::Vector{T}
-    index_containers::Vector{Vector{Int}}
     xperiodic::Bool
     yperiodic::Bool
     xperiod::Float64
     yperiod::Float64
-    period_tol::Float64
     VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64;
-    h = 2dr, r_max = 10dr, period_tol = 10dr,
+    h = 2dr, r_max = 10dr,
     xperiodic::Bool = false, yperiodic::Bool = false) where T = begin
-        extended_xmin = boundary_rect.xmin - period_tol*xperiodic*VECX - period_tol*yperiodic*VECY
-        extended_xmax = boundary_rect.xmax + period_tol*xperiodic*VECX + period_tol*yperiodic*VECY
+        extended_xmin = boundary_rect.xmin - r_max*xperiodic*VECX - r_max*yperiodic*VECY
+        extended_xmax = boundary_rect.xmax + r_max*xperiodic*VECX + r_max*yperiodic*VECY
         xperiod = boundary_rect.xmax[1] - boundary_rect.xmin[1]
         yperiod = boundary_rect.xmax[2] - boundary_rect.xmin[2]
         extended_rect = Rectangle(extended_xmin, extended_xmax)
         cell_list = CellList(h, extended_rect)
         polygons = T[]
-        index_containers = [PreAllocVector(Int, POLYGON_SIZEHINT) for _ in 1:Threads.nthreads()]
         return new{T}(
             dr,
             h,
@@ -30,17 +40,16 @@ mutable struct VoronoiGrid{T}
             boundary_rect, 
             extended_rect,
             cell_list, 
-            polygons, 
-            index_containers,
+            polygons,
             xperiodic,
             yperiodic,
             xperiod,
-            yperiod,
-            period_tol,
+            yperiod
         )
     end
 end
 
+# crop a polygon `poly` with respect to all other seed generators to create the Voronoi cell.
 @inbounds function voronoicut!(grid::VoronoiGrid{T}, poly::T) where T <: VoronoiPolygon
     x = poly.x
     prr = influence_rr(poly)
@@ -71,28 +80,40 @@ end
     end
 end
 
-@inbounds function remesh!(grid::VoronoiGrid)::Nothing
+"""
+    remesh!(grid::VoronoiGrid)
+
+Generate all Voronoi cells by performing all Voronoi cuts. This is called automatically when the VoronoiGrid
+is populated and each the Voronoi generators move in space.
+"""
+ function remesh!(grid::VoronoiGrid)
     # clear the cell list
     @batch for cell in grid.cell_list.cells
         empty!(cell)
     end
     # reset voronoi cells and add them to the cell list
-    @batch for i in eachindex(grid.polygons)
-        poly = grid.polygons[i]
-        reset!(poly, grid.extended_rect)
-        insert_periodic!(grid, poly.x, i)
-    end
-    # cut all voronoi cells
-    @batch for i in eachindex(grid.polygons)
-        voronoicut!(grid, grid.polygons[i])
-        sort_edges!(grid.polygons[i])
+    @inbounds begin
+        @batch for i in eachindex(grid.polygons)
+            poly = grid.polygons[i]
+            reset!(poly, grid.extended_rect)
+            insert_periodic!(grid, poly.x, i)
+        end
+        # cut all voronoi cells
+        @batch for i in eachindex(grid.polygons)
+            voronoicut!(grid, grid.polygons[i])
+            sort_edges!(grid.polygons[i])
+        end
     end
     return
 end
 
-# get shortest vector from y to x
-# is equal to x - y on non-periodic domains
-function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)
+"""
+    get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)::RealVector
+
+Return a vector from `y` to `x`. Equal to `x - y` on non-periodic domains. 
+For periodic rectangle, the shortest possible vector is returned.
+"""
+function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)::RealVector
     v = x - y
     if grid.xperiodic && (abs(v[1]) > 0.5*grid.xperiod)
         v -= sign(v[1])*grid.xperiod*VECX
@@ -103,6 +124,9 @@ function get_arrow(x::RealVector, y::RealVector, grid::VoronoiGrid)
     return v
 end
 
+# Insert a `label` at `x` to the cell list of `grid`. 
+# If `x` is near boundary, multiple copies need to be inserted, so that 
+# other polygons find the label in their neighborhood. 
 function insert_periodic!(grid::VoronoiGrid, x::RealVector, label::Int)
     cl = grid.cell_list
     insert!(cl, x, label)
@@ -122,19 +146,11 @@ function insert_periodic!(grid::VoronoiGrid, x::RealVector, label::Int)
     end
 end
 
+"""
+    nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T
 
-
-function _getNeighbors(grid::VoronoiGrid{T}, poly::T) where T <: VoronoiPolygon
-    container = grid.index_containers[Threads.threadid()]
-    empty!(container)
-    for e in poly.edges
-        if !isboundary(e)
-            push!(container, e.label)
-        end
-    end
-    return container
-end
-
+Find the nearest polygon to the reference point `x`. 
+"""
 function nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T where T <: VoronoiPolygon
     key0 = findkey(grid.cell_list, x)
     rr_best = Inf
@@ -161,6 +177,8 @@ function nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T where T <: Voro
     return grid.polygons[i_best]
 end
 
+# Find representant of Z in the periodic equivalence class such that it lies within 
+# the domain boundaries.
 function periodic_proj(grid::VoronoiGrid, Z::RealVector)::RealVector
     Zx = Z[1]
     Zy = Z[2]

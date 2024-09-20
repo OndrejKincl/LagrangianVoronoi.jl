@@ -1,5 +1,22 @@
+"""
+    LinearExpansion
+
+Static vector to store coefficients of a linear Taylor expansion.
+"""
 const LinearExpansion = SVector{2, Float64}
+
+"""
+    QuadraticExpansion
+
+Static vector to store coefficients of a quadratic Taylor expansion.
+"""
 const QuadraticExpansion = SVector{5, Float64}
+
+"""
+    CubicExpansion
+
+Static vector to store coefficients of a cubic Taylor expansion.
+"""
 const CubicExpansion = SVector{9, Float64}
 
 function gaussian_kernel(h::Float64, r::Float64)
@@ -18,8 +35,20 @@ function power_vector(::Type{CubicExpansion}, x::RealVector)::CubicExpansion
     return CubicExpansion(x[1], x[2], x[1]*x[1], x[1]*x[2], x[2]*x[2], x[1]*x[1]*x[1], x[1]*x[1]*x[2], x[1]*x[2]*x[2], x[2]*x[2]*x[2])
 end
 
+"""
+    movingls(::Type{T}, grid::VoronoiGrid, p::VoronoiPolygon, fun; h,  kernel)
 
-# Finds the Taylor expansion of a given function using moving least squares.
+Finds the Taylor expansion of a given function using moving least squares. 
+The first argument `T` should be one of following:
+
+* LinearExpansion
+* QuadraticExpansion
+* CubicExpansion
+
+Polygon `p` is where the Taylor expansion of a function `fun` is computed. A keyword argument `h` is the moving radius.
+This needs to be sufficiently big, otherwise the Taylor expension may be undefined. Kernel is the weighting function
+used for defining the (weighted) least squared problem.
+"""
 function movingls(
         ::Type{T},
         grid::VoronoiGrid, p::VoronoiPolygon, fun::Function; 
@@ -57,10 +86,21 @@ function movingls(
     return a
 end
 
+"""
+    poly_eval(val::Float64, taylor::T, dx::RealVector)::Float64 where {T <: SVector}
+
+Use this function to interpolate a value from the known Taylor expansion.
+"""
 function poly_eval(val::Float64, taylor::T, dx::RealVector)::Float64 where {T <: SVector}
     return val + dot(taylor, power_vector(T, dx))
 end
 
+"""
+    integral(p::VoronoiPolygon, val::Float64, taylor::SVector)::Float64
+
+Compute an integral of a polynomial over polygon `p` defined by value `val` at `p.x` and the 
+Taylor expansion `taylor`.
+"""
 function integral(p::VoronoiPolygon, val::Float64, taylor::LinearExpansion)::Float64
     int = 0.0
     for e in p.edges
@@ -93,6 +133,12 @@ function integral(p::VoronoiPolygon, val::Float64, taylor::CubicExpansion)::Floa
     return int
 end
 
+"""
+    point_value(grid::VoronoiGrid, x::RealVector, fun::Function)
+
+Obtain the interpolation of a function `fun` defined on polygons at an arbitrary point `x`.
+This is a slow code and should never be used in perfomance-critical areas.
+"""
 function point_value(grid::VoronoiGrid, x::RealVector, fun::Function)
     p = nearest_polygon(grid, x)
     L = movingls(LinearExpansion, grid, p, fun) 

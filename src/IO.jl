@@ -6,7 +6,11 @@ function invert(e::Edge)::Edge
     return Edge(e.v2, e.v1, label = e.label)
 end
 
-# export grid to a vtp file
+"""
+    export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
+
+Export grid to a vtk file. Append datasets specified by `vars`. Currently only numbers and vectors can be exported.
+"""
 function export_grid(grid::VoronoiGrid, filename::String, vars::Symbol...)
     verts = Vector{SVector{3, Float64}}()
     polys = Vector{MeshCell{PolyData.Polys}}()
@@ -43,6 +47,11 @@ function sort_edges!(poly::VoronoiPolygon)
     end
 end
 
+"""
+    export_points(grid::VoronoiGrid, filename::String, vars::Symbol...)
+
+Export points to a vtk file as a cloud of particles. Append datasets specified by `vars`.
+"""
 function export_points(grid::VoronoiGrid, filename::String, vars::Symbol...)
     points = [Vec3(grid.polygons[i].x) for i in eachindex(grid.polygons)]
     cells = [MeshCell(PolyData.Verts(), (i,)) for i in eachindex(grid.polygons)]

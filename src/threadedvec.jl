@@ -3,6 +3,11 @@ import Base: *
 import Base: similar, copyto!, fill!, pointer
 import LinearAlgebra: axpy!, rmul!, dot, norm
 
+"""
+    ThreadedVec
+
+A mulithreaded vector which uses @batch for algebraic operations.
+"""
 struct ThreadedVec{T} <: DenseVector{T}
     val::Vector{T}
     ThreadedVec(val::Vector{T}) where T = new{T}(val)

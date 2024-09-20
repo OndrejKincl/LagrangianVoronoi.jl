@@ -1,5 +1,10 @@
-# basic Voronoi Polygon for Navier-Stokes equations
-
+"""
+    PolygonNS(x::RealVector)
+    
+Predefined Voronoi Polygon for Navier-Stokes equations.
+Use this for compressible or incompressible fluids without heat conduction. 
+RealVector `x` is the position of the generating seed.
+""" 
 @kwdef mutable struct PolygonNS <: VoronoiPolygon
     x::RealVector         # position
 
@@ -25,11 +30,17 @@
 end
 
 PolygonNS(x::RealVector)::PolygonNS = PolygonNS(x=x)
+
 const GridNS = VoronoiGrid{PolygonNS}
 
 
-# Voronoi Polygon for Navier-Stokes-Fourier equations
+"""
+    PolygonNSF(x::RealVector)
 
+Predefined Voronoi Polygon for Navier-Stokes-Fourier equations. 
+Use this for compressible or incompressible fluids with heat conduction, or when you want to plot temperature.
+RealVector `x` is the position of the generating seed.
+"""
 @kwdef mutable struct PolygonNSF <: VoronoiPolygon
     x::RealVector        
 

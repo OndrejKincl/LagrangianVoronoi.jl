@@ -27,9 +27,6 @@ export VoronoiGrid, remesh!, nearest_polygon, get_arrow
 include("IO.jl")
 export export_grid, export_points
 
-include("apply.jl")
-export apply_binary!, apply_unary!, apply_local!
-
 include("movingls.jl")
 export LinearExpansion, QuadraticExpansion, CubicExpansion
 export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral, point_value
