@@ -51,3 +51,7 @@ function make_all()
 end
 
 make_all()
+
+deploydocs(
+    repo = "github.com/OndrejKincl/LagrangianVoronoi.jl.git",
+)
