@@ -1,6 +1,5 @@
 using Documenter, Literate, Pkg
 include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi
 #
 # Replace SOURCE_URL marker with github url of source
 #
