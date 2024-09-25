@@ -23,7 +23,7 @@ function populate_circ!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, c
             theta = 2.0*pi*k/k_max
             x = center + RealVector(r*cos(theta), r*sin(theta))
             if charfun(x) && isinside(grid.boundary_rect, x)
-                push!(grid.polygons, T(x))
+                push!(grid.polygons, T(x=x))
             end
         end
     end
@@ -53,7 +53,7 @@ function populate_rect!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, i
         for x2 in range(x2_min, x2_max, M)
             x = RealVector(x1, x2) + 0.5*RealVector(grid.dr, grid.dr)
             if charfun(x) && isinside(grid.boundary_rect, x)
-                push!(grid.polygons, T(x))
+                push!(grid.polygons, T(x=x))
             end
         end
     end
@@ -83,7 +83,7 @@ function populate_rand!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, i
         s2 = rand()
         x = (s1*x1_max + (1-s1)*x1_min)*VECX + (s2*x2_max + (1-s2)*x2_min)*VECY
         if charfun(x) && isinside(grid.boundary_rect, x)
-            push!(grid.polygons, T(x))
+            push!(grid.polygons, T(x=x))
         end
     end
     remesh!(grid)
@@ -110,7 +110,7 @@ function populate_vogel!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, 
         theta = 2.39996322972865332*i
         x = RealVector(center[1] + r*cos(theta), center[2] + r*sin(theta))
         if charfun(x) && isinside(grid.boundary_rect, x)
-            push!(grid.polygons, T(x))
+            push!(grid.polygons, T(x=x))
         end
     end
     remesh!(grid)
@@ -168,7 +168,7 @@ function populate_hex!(grid::VoronoiGrid{T}; charfun::Function = _everywhere, ic
         x2 = j*b
         x = RealVector(x1, x2)
         if charfun(x) && isinside(grid.boundary_rect, x)
-            push!(grid.polygons, T(x))
+            push!(grid.polygons, T(x=x))
         end
 	end
     remesh!(grid)

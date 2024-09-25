@@ -1,33 +1,48 @@
-# Gresho Vortex Benchmark
+#=
+# Example 1: Gresho Vortex Benchmark
+```@raw html
+    <img src='../assets/gresho.png' alt='missing' width="75%" height="50%"><br>
+```
+
+[Gresho vortex](https://www.cfd-online.com/Wiki/Gresho_vortex) is a very simple test which allows to compare a numerical solution to analytical result
+for arbitrary Mach number. The setup is a domain (usually square) with a prescribed vortex as the
+initial condition. 
+The vortex should be steady in theory but it is not trivial to reproduce such behavior in a numerical code,
+especially since the initial condition is not a differentiable function.
+
+Let us start by including LagrangianVoronoi module and importing some useful libraries. 
+=#
 
 module gresho
-
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters
+include("../src/LagrangianVoronoi.jl")
+using .LagrangianVoronoi, WriteVTK, LinearAlgebra, Match
 using LaTeXStrings, DataFrames, CSV, Plots, Measures
 
-include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi
+#=
+Declare constant parameters of the simulation. Especially the Mach number and the resolution.
+=#
 
-const v_char = 1.0
-const l_char = 0.4
-const rho0 = 1.0
+const rho0 = 1.0 # initial density
 const xlims = (-0.5, 0.5)
 const ylims = (-0.5, 0.5)
-const N = 100 #resolution
+const N = 100 # resolution
 const dr = 1.0/N
 
-const dt = 0.1*dr/v_char
-const t_end =  10*dt
-const nframes = 100
+const dt = 0.1*dr
+const t_end =  1.0
+const nframes = 100 # number of time frames (how many times we save the simulation state) 
 
-const c0 = Inf
-const gamma = 1.4
-const stiffened = (c0 > 100.0)
-const P0 = rho0*c0^2/gamma
+const Ma = 0.1 # Mach number
+const c0 = 1.0/Ma # speed of sound
+const gamma = 1.4 # adiabatic index
+const stiffened = (c0 > 100) # do we use ideal or stiffened gas model?
+const P0 = rho0*c0^2/gamma # initial density in the vortex core
 
-const export_path = "results/gresho/incompressible"
+const export_path = "results/gresho/Ma$Ma"
 
-# exact solution and initial velocity
+#=
+Define the exact solution, which is the same as initial condition.
+=#
 function v_exact(x::RealVector)::RealVector
     omega = @match norm(x) begin
         r, if r < 0.2 end => 5.0
@@ -46,20 +61,29 @@ function P_exact(x::RealVector)::Float64
     end
 end
 
-# enforce inital condition on a VoronoiPolygon
+#=
+This function enforces the inital condition on a VoronoiPolygon.
+=#
 function ic!(p::VoronoiPolygon)
-    p.v = v_exact(p.x)
-    p.rho = rho0
-    p.mass = p.rho*area(p)
-    p.P = P_exact(p.x)
-    p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+    p.v = v_exact(p.x) # velocity
+    p.rho = rho0 # density
+    p.mass = p.rho*area(p) # mass
+    p.P = P_exact(p.x) # pressure
+    p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0)) # internal energy
 end
 
+#=
+The Simulation worspace struct contains all simulation data, namely:
+* grid (and all local variables within)
+* pressure solver (allows us to solve an implicit system)
+* global (non-constant) variables
+Polygons are generated in its constructor.
+=#
 mutable struct Simulation <: SimulationWorkspace
     grid::GridNS
     solver::PressureSolver{PolygonNS}
-    E::Float64
-    l2_err::Float64
+    E::Float64  # total energy
+    l2_err::Float64 # L^2 error
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNS(domain, dr)
@@ -68,12 +92,17 @@ mutable struct Simulation <: SimulationWorkspace
     end
 end
 
+#=
+Function `step!` defines how simulation workspace changes when we update the time by `dt`.
+Number `t` is the simulation time before the update. We do not really need `t` but the 
+module requires this argument.
+=#
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
     if stiffened
-        stiffened_eos!(sim.grid, gamma, P0)
+        stiffened_eos!(sim.grid, gamma, P0) # stiffened gas equation of state
     else
-        ideal_eos!(sim.grid, gamma)
+        ideal_eos!(sim.grid, gamma) # ideal gas equation of state
     end
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
@@ -84,7 +113,10 @@ function step!(sim::Simulation, t::Float64)
     return
 end
 
-# find energy and l2 error
+#=
+Function `postproc!`is called each time before the data is saved (much less often than `step!`).
+It can be used for post-processing but let's just print some information to the console.
+=#
 function postproc!(sim::Simulation, t::Float64) 
     sim.l2_err = 0.0
     sim.E = 0.0
@@ -93,19 +125,25 @@ function postproc!(sim::Simulation, t::Float64)
         sim.E += p.mass*p.e
     end
     sim.l2_err = sqrt(sim.l2_err)
-    @show sim.E
-    @show sim.l2_err
+    percent = round(100*t/t_end, digits = 5)
+    println("t = $t ($(percent)%)")
+    println("energy = $(sim.E)")
+    println("error = $(sim.l2_err)")
+    println()
 end
 
-
+#=
+Wrap everything into the `main` function. Once the simulation ends, extract the velocity along midline and plot it. 
+=#
 function main()
     sim = Simulation()
-    run!(sim, dt, t_end, step!; path = export_path, 
-        vtp_vars = (:v, :P), csv_vars = (:E, :l2_err),
+    run!(sim, dt, t_end, step!; 
+        path = export_path, 
         postproc! = postproc!,
-        nframes = nframes
+        vtp_vars = (:v, :P),      # local variables exported into vtp
+        csv_vars = (:E, :l2_err), # global variables exported into csv
+        nframes = nframes         # number of time frames
     )
-    # store velocity profile along midline
     vy = Float64[]
     vy_exact = Float64[]
     x_range = 0.0:(2*dr):xlims[2]
@@ -127,7 +165,7 @@ function plot_midline()
         csv_data.vy_exact,
         xlabel = L"x",
         ylabel = L"v_y",
-        label = "EXACT",
+        label = "exact",
         color = :black,
         axisratio = 0.5,
         bottom_margin = 5mm,
@@ -137,7 +175,7 @@ function plot_midline()
         plt,
         csv_data.x,
         csv_data.vy,
-        label = "SILVA",
+        label = "simulation",
         markershape = :hex,
         markersize = 3,
         linewidth = 2.0
@@ -145,38 +183,9 @@ function plot_midline()
     savefig(plt, string(export_path, "/midline_plot.pdf"))
 end
 
-function plot_midline_all_Mach()
-    Ma0001 = CSV.read(string("results/gresho/Ma0.001/midline_data.csv"), DataFrame)
-    Ma001 = CSV.read(string("results/gresho/Ma0.01/midline_data.csv"), DataFrame)
-    Ma01 = CSV.read(string("results/gresho/Ma0.1/midline_data.csv"), DataFrame)
-    Ma1 = CSV.read(string("results/gresho/Ma1.0/midline_data.csv"), DataFrame)
-    #Ma10 = CSV.read(string("results/gresho/Ma10.0/midline_data.csv"), DataFrame)
-    Ma100 = CSV.read(string("results/gresho/Ma100.0/midline_data.csv"), DataFrame)
-    plt = plot(
-        xlabel = L"x",
-        ylabel = L"v_y",
-        bottom_margin = 5mm,
-    )
-    plot!(plt,
-        Ma1.x,
-        Ma1.vy_exact,
-        label = "exact solution",
-        color = :black,
-        linewidth = 1.0,
-    )
-    plot_y = [Ma0001.vy Ma001.vy Ma01.vy Ma1.vy Ma100.vy]
-    plot!(plt,
-        Ma1.x,
-        plot_y,
-        label = ["Ma = 0.001" "Ma = 0.01" "Ma = 0.1" "Ma = 1" "Ma = 100"],
-        linewidth = 1.0,
-        color = [:blue :red :darkgreen :purple :orange],
-        markershape = [:hex :circ :star7 :utriangle :dtriangle]
-    )
-    savefig(plt, string("results/gresho/midline_plot_all_Mach.pdf"))
-end
-
-
+#=
+This piece of code allows to run the script from the terminal.
+=#
 if abspath(PROGRAM_FILE) == @__FILE__
     main()
 end

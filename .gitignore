@@ -1,11 +1,7 @@
-*.pdf
-*.vtp
-*.pvd
-*.csv
-*.mp4
-*.png
-*.jpg
 *.mem
 trash
+examples/results
 *.gz
 *.pvsm
+examples/reference/sedov.pdf
+docs/src/examples

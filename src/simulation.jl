@@ -35,7 +35,7 @@ Note this assumes constant time step. See `examples/sedov.jl` for an example wit
 function run!(sim::SimulationWorkspace, dt::Float64, t_end::Float64, step!::Function;
     nframes::Int = 100,
     path::String = "results",
-    save_points::Bool = true,
+    save_points::Bool = false,
     save_grid::Bool = true,
     save_csv::Bool = true,
     vtp_vars = Symbol[],
@@ -70,7 +70,6 @@ function run!(sim::SimulationWorkspace, dt::Float64, t_end::Float64, step!::Func
         k += 1
         step!(sim, t)
         if (k % k_frame == 0)
-            @show t
             postproc!(sim, t)
             push!(csv_data[:time], t)
             for var in csv_vars

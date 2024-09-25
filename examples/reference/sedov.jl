@@ -5,17 +5,18 @@ import SpecialFunctions:gamma
 const VEC = SVector{3, Float64}
 const MAT = SMatrix{3, 3, Float64, 9}
 
-const d = 2
-const kappa = 7/5 #5/3
-const E_yield = 0.3
+const d = 2 # dimension 
+const kappa = 7/5 # adiabatic index
+const E_yield = 0.3 # yield energy
 const rho1 = 1.0
 const rho_min = 1e-4
 const eta_min = 1e-4
+
 const dt = 1e-4
 const t_plot = 1.0
 const x0_plot = 0.0
 const x1_plot = 1.0
-const unit_sphere = 2.0*pi^(d/2)/gamma(d/2)
+const unit_sphere = 2.0*pi^(d/2)/gamma(d/2) # the volume of a unit sphere in d dimensions
 
 function odefun(u, p, eta)
     if u[1] < rho_min

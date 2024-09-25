@@ -1,7 +1,17 @@
-module rabe #Rayleigh-Bénard instability
+#=
+# Example 7: Rayleigh-Bénard Instability
+```@raw html
+    <img src='../assets/heat.png' alt='missing' width="50%" height="50%"><br>
+```
+
+This test is similar to Rayleigh-Taylor but even more amazing. The top side of the domain is hot
+and the bottom is cold. The hot fluid expands and rises up, then cools again and sinks. The resulting dynamical
+pattern is called a *convective cell*. It is somehow related to atmosphere and weather. You can read more on [wikipedia](https://en.wikipedia.org/wiki/Rayleigh%E2%80%93B%C3%A9nard_convection).   
+=#
+
+module heat
 include("../src/LagrangianVoronoi.jl")
 using .LagrangianVoronoi
-using Match, Polyester, LinearAlgebra, WriteVTK
 
 
 const g = 9.8 #gravitation acceleration
@@ -20,45 +30,22 @@ const c0 = sqrt(gamma*P0/rho0)
 const Tu = P0/(rho0*R) #temperature of upper boundary (cooler)
 const Td = 1000.0 #30.0 #Tu*(1.0 + contrast) #temperature of lower boundary (heater)
 
-const export_path = "results/rabe_test"
-const dr = H/150
+const export_path = "results/heat"
+const dr = H/100
 const v_char = 2.0
 const dt = 0.1*dr/v_char
 const nframes = 400
-const t_end = 10*dt #2.0
+const t_end = 1.0
 
 function print_info()
-    @show Tu
-    @show Td
     thermal_D = thermal_k/(rho0*gamma*cV) #thermal diffusivity
     thermal_a = 1.0/Tu
     nu = mu/rho0
-    @show Pr = nu/thermal_D #Prandtl of air is about 0.71
-    dT = Td - Tu
-    contrast = dT/Tu
-    @show Ra = thermal_a*g*dT*(H^3)/(nu*thermal_D)
-    m = (g*H)/(R*Tu*contrast) 
-    stability_index = (gamma - 1.0)*m
-    @show stability_index
-    @show R
-    @match stability_index begin
-        x, if x < 1.0 end => println("Stable")
-        x, if x > 1.0 end => println("Unstable")
-    end
-    if (Tu >= Td)
-        throw("Td should be bigger than Tu")
-    end
+    @show Pr = nu/thermal_D # Prandtl number
+    @show Ra = thermal_a*g*(Td-Tu)*(H^3)/(nu*thermal_D) # Rayleigh number
 end
 
-function linear_atmo!(p::VoronoiPolygon)
-    p.P = P0 + rho0*g*(H - p.x[2])
-    p.rho = rho0
-    p.e = p.P/(p.rho*(gamma-1.0))
-    p.mass = p.rho*area(p)
-    p.k = thermal_k
-    p.cV = cV
-    p.T = p.e/cV
-end
+# Define the initial state (exponential atmosphere) and the boundary condition for temperature.
 
 function exp_atmo!(p::VoronoiPolygon)
     p.T = Tu
@@ -70,58 +57,21 @@ function exp_atmo!(p::VoronoiPolygon)
     p.cV = cV
 end
 
-function const_atmo!(p::VoronoiPolygon)
-    p.T = Tu
-    p.P = P0
-    p.e = cV*p.T
-    p.rho = p.P/((gamma-1.0)*p.e)
-    p.mass = p.rho*area(p)
-    p.k = thermal_k
-    p.cV = cV
-end
-
-# boundary condition for temperature
 function T_bc(::RealVector, bdary::Int)::Float64
     if (bdary == BDARY_DOWN)
         return Td 
     elseif (bdary == BDARY_UP)
         return Tu
     end
-    return NaN
+    return NaN # NaN indicates an adiabatic wall
 end
 
-function enforce_bc!(grid::VoronoiGrid, dt::Float64, T_bc::Function)
-    @batch for p in grid.polygons
-        if !isboundary(p)
-            continue
-        end
-        implicit_factor = 1.0
-        thermal_D = thermal_k/(p.rho*gamma*cV)
-        e_kinetic = 0.5*norm_squared(p.v)
-        p.T = (p.e - e_kinetic)/cV
-        A = area(p)
-        for e in p.edges
-            if !isboundary(e)
-                continue
-            end
-            m = 0.5*(e.v1 + e.v2)
-            n = normal_vector(e)
-            lrr = len(e)/abs(dot(m - p.x, n)) + 0.01*dr
-            T = T_bc(m, e.label)
-            if !isnan(T)
-                tmp = dt*thermal_D*lrr/A
-                p.T += tmp*T
-                implicit_factor += tmp
-            end
-        end
-        p.T /= implicit_factor
-        p.e = e_kinetic + cV*p.T
-    end
-end
+# The rest is fairly standard, except we also need to include
+# Fourier diffusion in our time-marching scheme. 
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNSF
-    solver::PressureSolver{PolygonNSF}
+    grid::GridNS
+    solver::PressureSolver{PolygonNS}
     E::Float64
     S::Float64
     E_kinetic::Float64
@@ -129,7 +79,7 @@ mutable struct Simulation <: SimulationWorkspace
         xlims = (0.0, W)
         ylims = (0.0, H)
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNSF(domain, dr)
+        grid = GridNS(domain, dr, xperiodic = true)
         populate_lloyd!(grid, ic! = exp_atmo!)
         return new(grid, PressureSolver(grid), 0.0, 0.0, 0.0)
     end
@@ -141,9 +91,9 @@ function step!(sim::Simulation, t::Float64)
     ideal_eos!(sim.grid, gamma)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
-    ideal_temperature!(sim.grid)
-    fourier_step!(sim.grid, dt)
-    enforce_bc!(sim.grid, dt, T_bc)
+    ideal_temperature!(sim.grid) # find the temperature according to ideal gas laws
+    fourier_step!(sim.grid, dt)  # update the temperature by Fourier diffusion
+    heat_from_bdary!(sim.grid, dt, T_bc, gamma) # add heat flux from boundaries
     find_D!(sim.grid)
     viscous_step!(sim.grid, dt)
     find_dv!(sim.grid, dt)
@@ -161,9 +111,12 @@ function postproc!(sim::Simulation, t::Float64)
         sim.E += p.mass*p.e
         sim.E_kinetic += 0.5*p.mass*norm_squared(p.v)
     end
+    percent = round(100*t/t_end, digits = 5)
+    println("t = $t ($(percent)%)")
     @show sim.E
     @show sim.S
     @show sim.E_kinetic
+    println()
 end
 
 function main()
@@ -174,6 +127,10 @@ function main()
         postproc! = postproc!,
         nframes = nframes
     )
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
 end
 
 end

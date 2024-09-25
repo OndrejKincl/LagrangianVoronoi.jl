@@ -1,5 +1,3 @@
-include("geometry.jl")
-
 const POLYGON_SIZEHINT = 10
 const SIGNUM_EPS = 2*eps(Float64)
 

@@ -177,20 +177,16 @@ function nearest_polygon(grid::VoronoiGrid{T}, x::RealVector)::T where T <: Voro
     return grid.polygons[i_best]
 end
 
-# Find representant of Z in the periodic equivalence class such that it lies within 
+
+function least_positive_residue(x::Float64, d::Float64)::Float64
+    return ((x%d) + d)%d
+end
+
+# Find the representant of Z in the periodic equivalence class such that it lies within 
 # the domain boundaries.
-function periodic_proj(grid::VoronoiGrid, Z::RealVector)::RealVector
-    Zx = Z[1]
-    Zy = Z[2]
-    if grid.xperiodic
-        xperiod = abs(grid.boundary_rect.xmax[1] - grid.boundary_rect.xmin[1])
-        Zx = (Z[1] - grid.boundary_rect.xmin[1])%xperiod
-        Zx = (Zx + xperiod)%xperiod + grid.boundary_rect.xmin[1]
-    end
-    if grid.yperiodic   
-        yperiod = abs(grid.boundary_rect.xmax[2] - grid.boundary_rect.xmin[2])
-        Zy = (Z[2] - grid.boundary_rect.xmin[2])%yperiod
-        Zy = (Zy + yperiod)%yperiod + grid.boundary_rect.xmin[2]
-    end
-    return Zx*VECX + Zy*VECY
+function periodic_wrap(grid::VoronoiGrid, x::RealVector)::RealVector
+    xmin = grid.boundary_rect.xmin
+    _x = least_positive_residue(x[1] - xmin[1], grid.xperiod) + xmin[1]
+    _y = least_positive_residue(x[2] - xmin[2], grid.yperiod) + xmin[2]
+    return x + grid.xperiodic*(_x - x[1])*VECX + grid.yperiodic*(_y - x[2])*VECY
 end

@@ -5,8 +5,6 @@ import LinearAlgebra: mul!
     pressure_step!(grid::VoronoiGrid, dt::Float64)  
 
 Update the velocity and energy by the pressure field. This assumes that pressure was already determined.
-
-Required variables: `v`, `e`, `P`, `mass`.
 """
 function pressure_step!(grid::VoronoiGrid, dt::Float64)  
     @batch for p in grid.polygons
@@ -29,8 +27,6 @@ end
     eint(p::VoronoiPolygon)::Float64 
 
 Return the internal energy of a Voronoi Polygon.
-
-Required variables: `v`, `e`.
 """
 function eint(p::VoronoiPolygon)::Float64 
     return p.e - 0.5*norm_squared(p.v)
@@ -42,8 +38,6 @@ end
 Compute pressure and sound speed from internal energy and density using ideal gas equation of state.
 Number `gamma` is adiabatic index and `Pmin` can specify least possible value pressure.
 In the semi-implicit scheme, this value of pressure is used as an initial condition for an implicit solver.
-
-Required variables: `v`, `e`, `P`, `rho`, `mass`.
 """
 function ideal_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4; Pmin::Float64 = 0.0) 
     @batch for p in grid.polygons
@@ -59,8 +53,6 @@ end
 Compute pressure and sound speed from internal energy and density using ideal gas equation of state.
 Number `gamma` is adiabatic index and `P0` is the stiffness constant.
 Stiffened equation of state fares better for flows with very low Mach number.
-
-Required variables: `v`, `e`, `P`, `rho`, `mass`.
 """
 function stiffened_eos!(grid::VoronoiGrid, gamma::Float64 = 1.4, P0::Float64 = 0.0)
     @batch for p in grid.polygons
@@ -74,8 +66,6 @@ end
     gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
 
 Update velocity field and specific energy by a gravitational force.
-
-Required variables: `v`, `e`.
 """
 function gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
     @batch for p in grid.polygons
@@ -167,19 +157,12 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     b = solver.b
     P = solver.P
     GP = solver.GP
-    # find mean pressure
-    P_mean = 0.0
-    @batch for p in grid.polygons
-        P_mean += p.P
-    end
-    P_mean /= length(grid.polygons)
     @batch for i in eachindex(grid.polygons)
         @inbounds begin
             p = grid.polygons[i]
+            p.rho = p.mass/area(p)
             b[i] = p.mass*p.P/(p.rho^2*p.c2*dt^2)
-            # serves as an initial guess
-            # substracting the mean value is good for incompressible case
-            P[i] = p.P - P_mean 
+            P[i] = p.P # serves as an initial guess
             GP[i] = VEC0
             for (q,e,y) in neighbors(p, grid)
                 lrr = lr_ratio(p.x-y,e)
@@ -213,8 +196,6 @@ end
 
 Find the estimated value of pressure field at the next time step. 
 Integer `niter` is the number fixed point iteratrions.
-
-Required variables in Voronoi Polygon: `v`, `P`, `mass`, `rho`, `c2`.
 """ 
 function find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64 = 5)
     refresh!(solver.A, solver.grid, dt)

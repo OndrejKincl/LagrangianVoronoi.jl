@@ -1,80 +1,75 @@
-module double_shear
+#=
+# Example 4: Double Shear Layer
+```@raw html
+    <img src='../assets/doubleshear.png' alt='missing' width="75%" height="50%"><br>
+```
 
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters, Polyester
-using SmoothedParticles:rDwendland2
-using LaTeXStrings, DataFrames, CSV, Plots, Measures
+In this setup, borrowed from this [paper](https://www.sciencedirect.com/science/article/pii/S0021999116000693), we consider a periodic domain and an initial velocity
+field
 
+``u = \tanh\left(\xi \left(y - \frac{1}{4}\right) \right), \quad y < \frac{1}{2}``
 
+``u = \tanh\left(\xi \left(\frac{3}{4} - y\right) \right), \quad y \geq \frac{1}{2}``
+
+``v = \delta \sin(2 \pi x)``
+
+with ``\delta = 0.05``, ``\xi = 30``, with constant initial density ``\rho_0 = 1``, viscosity ``\mu = 2E-4`` and pressure 
+`` P_0 = \frac{1}{\gamma}.`` These conditions generate an interesting flow pattern, 
+which is essentially a Kelvin-Helmholtz instability. The problem relies on a periodic
+boundary condition which must be specified in the `VoronoiGrid` constructor.
+=#
+
+module doubleshear
 include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi
+using .LagrangianVoronoi, LinearAlgebra, Polyester
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
 const ylims = (0.0, 1.0)
 const mu = 2e-4
-const dr = 5e-3
+const dr = 1e-2
 const gamma = 1.4
 const P0 = 100.0/gamma
 
 const delta = 0.05
-const slope = 30.0
+const xi = 30.0
 const v_char = 2.0
 const dt = 0.1*dr/v_char
 
 const t_end = 1.8
 
-const export_path = "results/double_shear"
-const nframes = 200
+const export_path = "results/doubleshear"
+const nframes = 100
 
 function ic!(p::VoronoiPolygon)
     p.v = v_init(p.x)
     p.rho = rho0
     p.mass = p.rho*area(p)
-    p.P = 100.0/gamma
+    p.P = P0
     p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
     p.mu = mu
 end
 
 function v_init(x::RealVector)::RealVector
-    u =  (x[2] <= 0.5) ? tanh(slope*(x[2] - 0.25)) : tanh(slope*(0.75 - x[2]))
+    u =  (x[2] <= 0.5) ? tanh(xi*(x[2] - 0.25)) : tanh(xi*(0.75 - x[2]))
     v = delta*sin(2pi*x[1])
     return RealVector(u,v)
 end
 
-@kwdef mutable struct MyPolygon <: VoronoiPolygon
-    x::RealVector        # position
-
-    rho::Float64  = 0.0  # density
-    v::RealVector = VEC0 # velocity
-    e::Float64    = 0.0  # specific energy
-    a::RealVector = VEC0
-    
-    P::Float64    = 0.0  # pressure
-    c2::Float64   = 0.0  # speed of sound squared
-    D::RealMatrix = MAT0 # velocity deformation tensor
-    S::RealMatrix = MAT0 # viscous stress
-    mu::Float64 = 0.0    # dynamic viscosity
-    dv::RealVector = VEC0
-
-    # extensive vars
-    mass::Float64 = 0.0
-    momentum::RealVector = VEC0
-    energy::Float64 = 0.0
-    phase::Int = 0
-    quality::Float64 = 0.0
-
+#=
+In this example, we would like to compute vorticity. Unfortunately, the predefined Navier-Stokes polygon
+is not equipped with a vorticity field. However, we can create our custom 
+type `PolygonWithVorticity` and perform all computations with it.  
+=#
+@kwdef mutable struct PolygonWithVorticity <: VoronoiPolygon
+    @fluid_variables    # all standard variables
     vort::Float64 = 0.0 # vorticity
-
-    # sides of the polygon (in no particular order)
-    edges::FastVector{Edge} = emptypolygon()
 end
-
-MyPolygon(x::RealVector)::MyPolygon = MyPolygon(x=x)
-const MyGrid = VoronoiGrid{MyPolygon}
+const GridWithVorticity = VoronoiGrid{PolygonWithVorticity}
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::MyGrid
-    solver::PressureSolver{MyPolygon}
+    grid::GridWithVorticity
+    solver::PressureSolver{PolygonWithVorticity}
     E::Float64
     S::Float64
     E0::Float64
@@ -82,25 +77,30 @@ mutable struct Simulation <: SimulationWorkspace
     first_step::Bool
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = MyGrid(domain, dr, xperiodic = true, yperiodic = true)
+        grid = GridWithVorticity(domain, dr, xperiodic = true, yperiodic = true) # the domain is periodic both horizontally and vertically
         populate_lloyd!(grid, ic! = ic!)
         solver = PressureSolver(grid)
         return new(grid, solver, 0.0, 0.0, 0.0, 0.0, true)
     end
 end
 
-function get_vort!(grid::MyGrid)
+#=
+We need to define a custom function for vorticity evaluation.
+The vorticity can be evauluated using moving least squares. 
+(Also known as "linear reconstruction" in some circles.) This is not the only way how vorticity can be
+approximated.
+=#
+function get_vort!(grid::GridWithVorticity)
     @batch for p in grid.polygons
-        p.vort = 0.0
-        for (q,e,y) in neighbors(p, grid)
-            lrr = lr_ratio(p.x-y, e)
-            m = midpoint(e)
-            tmp = (p.v[2] - q.v[2])*VECX - (p.v[1] - q.v[1])*VECY
-            p.vort -= lrr*dot(tmp, m - p.x) 
-        end
-        p.vort /= area(p)
+        gradu = movingls(LinearExpansion, grid, p, p -> p.v[1])
+        gradv = movingls(LinearExpansion, grid, p, p -> p.v[2])
+        p.vort = gradv[1] - gradu[2]
     end
 end
+
+#=
+The remainder of the script is as usual.
+=#
 
 function step!(sim::Simulation, t::Float64)
     move!(sim.grid, dt)
@@ -122,7 +122,7 @@ function postproc!(sim::Simulation, t::Float64)
     sim.S = 0.0
     for p in grid.polygons
         sim.E += p.mass*p.e
-        sim.S += p.mass*(log(p.P/P0) - gamma*log(p.rho/rho0))
+        sim.S += p.mass*(log(abs(p.P/P0)) - gamma*log(abs(p.rho/rho0)))
     end
     if sim.first_step
         sim.E0 = sim.E
@@ -144,7 +144,7 @@ function main()
         nframes = nframes, 
         path = export_path,
         save_csv = false,
-        save_points = false,
+        save_points = true,
         save_grid = true,
         vtp_vars = (:P, :v, :rho, :vort)
     )

@@ -29,7 +29,7 @@ export export_grid, export_points
 
 include("movingls.jl")
 export LinearExpansion, QuadraticExpansion, CubicExpansion
-export ls_reconstruction, power_vector, ls_reconstruction, poly_eval, integral, point_value
+export power_vector, poly_eval, integral, point_value, movingls
 
 include("populate.jl")
 export populate_circ!, populate_rand!, populate_vogel!, populate_rect!, populate_lloyd!, populate_hex!, get_mass!
@@ -44,7 +44,7 @@ include("simulation.jl")
 export SimulationWorkspace, run!, movingavg
 
 include("celldefs.jl")
-export GridNS, PolygonNS, GridNSF, PolygonNSF
+export GridNS, PolygonNS, @fluid_variables
 
 include("move.jl")
 export move!
@@ -53,13 +53,13 @@ include("pressure.jl")
 export pressure_step!, ideal_eos!, stiffened_eos!, gravity_step!, PressureOperator, PressureSolver, find_pressure!
 
 include("diffusion.jl")
-export find_D!, viscous_step!
+export find_D!, viscous_step!, bdary_friction!
 
 include("relaxation.jl")
 export find_dv!, relaxation_step!, MultiphaseSolver, multiphase_projection!
 
 include("fourier.jl")
-export ideal_temperature!, fourier_step!, fourier_dirichlet_bc!
+export ideal_temperature!, fourier_step!, heat_from_bdary!
 
 
 

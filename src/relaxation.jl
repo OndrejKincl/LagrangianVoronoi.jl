@@ -6,8 +6,6 @@ is needed to maintain sufficiently high mesh quality. The repair velocity is cho
 proportional to the mesh quality squared. There is also multiplicative dimensionless
 parameter `alpha` with default value `alpha = 1`. Higher `alpha` causes the Voronoi cells
 to be rounder (= better) but also less genuinly Lagrangian.
-
-Required variables in Voronoi Polygon: `dv`, `D`, `quality`.
 """
 function find_dv!(grid::VoronoiGrid, dt::Float64, alpha::Float64 = 1.0)
     @batch for p in grid.polygons
@@ -29,13 +27,11 @@ end
 """
     relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
 
-Update the generating seeds using the repair velocity `dv`. The repair velocity should be known
+Update the variables by taking into account the repair velocity `dv`. The repair velocity should be known
 before the `relalaxation_step!` is called. See `find_dv!`. The mass, momentum and energy of each cell
 is updated by solving one step of an advection problem. A keyword boolean argument `rusanov` controls the use of a
 Rusanov approximate Riemann solver. The Rusanov flux is recommended to prevent the generation of new extrema (like negative density) and decrease of entropy.
 This is a second step of the mesh relaxation procedure (or maybe third, if your simulation involves a multiphase projector).
-
-Required variables: `dv`, `v`, `e`, `mass`, `momentum`, `energy`, `phase`.
 """
 function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
     @batch for p in grid.polygons
@@ -71,9 +67,7 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
     @batch for p in grid.polygons
         p.v = p.momentum/p.mass
         p.e = p.energy/p.mass
-        p.x += dt*p.dv
     end
-    remesh!(grid)
 end
 
 """
@@ -180,8 +174,6 @@ Solve the linear system to find an orthogonal projection of `dv` to a constraint
 which gurantees conservation of area for every fluid phase. You only need this for multiphase flows.
 You can also run multiphase problems without it but expect some artificial density ridges between
 phases of different densities.
-
-Required variables: `dv`, `phase`, `quality`.
 """
 function multiphase_projection!(solver::MultiphaseSolver)
     refresh!(solver)

@@ -1,12 +1,19 @@
-module tagr
+#=
+# Example 8: Taylor-Green Vortex
 
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters
-using SmoothedParticles:rDwendland2
-using LaTeXStrings, DataFrames, CSV, Plots, Measures
+In the field of mathematical modeling, benchmarks can be divided into two categories: those which
+are very cool but completely useless and those which are useful but extremely boring. 
+[Taylor-Green vortex](https://en.wikipedia.org/wiki/Taylor%E2%80%93Green_vortex) belong to the second category. There is nothing interesting here: the fluid
+has only one phase and the velocity field is smooth and steady periodic vortex lattice. However,
+it has an analytic solution and we can use it to assess the convergence rate. So far, we only have linear rate
+but maybe in distant future, somebody implements a second order operators for Lagrangian Voronoi cells.
+=#
 
-
+module taylorgreen
 include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi
+using .LagrangianVoronoi, WriteVTK, LinearAlgebra
+using DataFrames, CSV, Plots, Measures
+
 
 const rho0 = 1.0
 const xlims = (0.0, 1.0)
@@ -21,7 +28,7 @@ const P0 = rho0*c0^2/gamma
 const l_char = 1.0
 const v_char = 1.0
 
-const export_path = "results/tagr"
+const export_path = "results/taylorgreen"
 
 function v_max(Re::Float64, t::Float64)::Float64
     return exp(-8.0*pi^2*t/Re)
@@ -110,6 +117,7 @@ function postproc!(sim::Simulation, t::Float64)
     @show sim.v_err
     @show sim.P_err
     @show sim.E_err
+    println()
     sim.first_it = false
     return
 end

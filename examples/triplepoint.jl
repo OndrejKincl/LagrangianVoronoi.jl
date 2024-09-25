@@ -1,46 +1,50 @@
-# Gresho Vortex Benchmark
+#=
+# Example 6: Triple-point problem
+```@raw html
+    <img src='../assets/triplepoint.png' alt='missing' width="75%" height="50%" /><br>
+```
+
+Triple point is a fancy benchmark which contains three separate gases with different properties.
+It is described in detail in this [paper](https://www.sciencedirect.com/science/article/pii/S0021999116000693) and is essentially a two-dimensional version of a
+[Riemann Problem](https://en.wikipedia.org/wiki/Riemann_problem). Scientists like it just because it creates a very cool spiral.
+=#
 
 module triplepoint
 
-using WriteVTK, LinearAlgebra, Random, Match,  Parameters, Polyester
-using SmoothedParticles:rDwendland2
-using LaTeXStrings, DataFrames, CSV, Plots, Measures
-
 include("../src/LagrangianVoronoi.jl")
-using .LagrangianVoronoi
+using .LagrangianVoronoi, Polyester
 
 
 const rho0 = 1.0
 const xlims = (0.0, 7.0)
 const ylims = (0.0, 3.0)
 const dr = 1e-2
+const nframes = 200
+const CFL = 0.1
+const v_char = 1.5
+const dt = CFL*dr/v_char
+const t_end = 3.0
+const export_path = "results/triplepoint"
 
+#=
+This struct helps to reduce the number of constant variables.
+Numbers `xmin, xmax, ymin, ymax` specify the rectangle where the phase is located at t = 0.
+=#
 struct FluidPhase
-    label::Int
-    rho::Float64
-    P::Float64
-    gamma::Float64
+    label::Int      # phase label
+    rho::Float64    # initial density
+    P::Float64      # initial density
+    gamma::Float64  # adiabatic index
     xmin::Float64
     xmax::Float64
     ymin::Float64
     ymax::Float64
 end
-
 const phase1 = FluidPhase(1, 1, 1, 1.5, 0, 1, 0, 3)
 const phase2 = FluidPhase(2, 1, 0.1, 1.4, 1, 7, 0, 1.5)
 const phase3 = FluidPhase(3, 0.125, 0.1, 1.5, 1, 7, 1.5, 3)
 const fluidphases = [phase1, phase2, phase3]
 
-const nframes = 200
-const CFL = 0.1
-const v_char = 1.5
-const dt = CFL*dr/v_char
-
-const t_end = 10*dt #3.0
-
-const export_path = "results/triplepoint"
-
-# enforce inital condition on a VoronoiPolygon
 function ic!(p::VoronoiPolygon)
     for fp in fluidphases
         if (fp.xmin <= p.x[1] <= fp.xmax) && (fp.ymin <= p.x[2] <= fp.ymax)
@@ -53,6 +57,11 @@ function ic!(p::VoronoiPolygon)
     end
 end
 
+#=
+Let us define our custom equation of state, which is different for
+every fluid phase. The `@batch` macro from the `Polyester` package makes it run in parallel.
+It is approximately godzillion times faster than `@threads`.
+=#
 function multi_eos!(grid::VoronoiGrid)
     @batch for p in grid.polygons
         fp = fluidphases[p.phase]
@@ -66,6 +75,9 @@ function multi_eos!(grid::VoronoiGrid)
     end
 end
 
+#=
+The rest of the script is just the standard procedure.
+=#
 mutable struct Simulation <: SimulationWorkspace
     grid::GridNS
     psolver::PressureSolver
@@ -80,7 +92,6 @@ mutable struct Simulation <: SimulationWorkspace
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridNS(domain, dr)
         populate_hex!(grid, ic! = ic!)
-        #populate_lloyd!(grid, ic! = ic!)
         psolver = PressureSolver(grid)
         msolver = MultiphaseSolver(grid)
     return new(grid, psolver, msolver, 0.0, 0.0, 0.0, 0.0, 0.0, true)
@@ -100,7 +111,7 @@ function step!(sim::Simulation, t::Float64)
     return
 end
 
-# find energy and l2 error
+
 function postproc!(sim::Simulation, t::Float64)
     @show t
     grid = sim.grid
