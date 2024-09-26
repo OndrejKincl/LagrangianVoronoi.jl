@@ -1,10 +1,6 @@
+# LagrangianVoronoi.jl - Documentation
+
 ```@raw html
-    <img src='assets/voronoimesh.png' alt='missing' class='center'><br>
+    <img src="assets/voronoimesh.png" alt="" style="height: 400px"/>
 ```
 
-````@eval
-using Markdown
-Markdown.parse("""
-$(read("../../README.md",String))
-""")
-````
