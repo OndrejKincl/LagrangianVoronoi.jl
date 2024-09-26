@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 5: Rayleigh-Taylor Instability · LagrangianVoronoi.jl</title><meta name="title" content="Example 5: Rayleigh-Taylor Instability · LagrangianVoronoi.jl"/><meta property="og:title" content="Example 5: Rayleigh-Taylor Instability · LagrangianVoronoi.jl"/><meta property="twitter:title" content="Example 5: Rayleigh-Taylor Instability · LagrangianVoronoi.jl"/><meta name="description" content="Documentation for LagrangianVoronoi.jl."/><meta property="og:description" content="Documentation for LagrangianVoronoi.jl."/><meta property="twitter:description" content="Documentation for LagrangianVoronoi.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">LagrangianVoronoi.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="gresho.html">Example 1: Gresho Vortex Benchmark</a></li><li><a class="tocitem" href="cavity.html">Example 2: Lid-driven cavity</a></li><li><a class="tocitem" href="sedov.html">Example 3: Sedov Blast</a></li><li><a class="tocitem" href="doubleshear.html">Example 4: Double Shear Layer</a></li><li class="is-active"><a class="tocitem" href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li><li><a class="tocitem" href="triplepoint.html">Example 6: Triple-point problem</a></li><li><a class="tocitem" href="heat.html">Example 7: Rayleigh-Bénard Instability</a></li><li><a class="tocitem" href="taylorgreen.html">Example 8: Taylor-Green Vortex</a></li></ul></li><li><a class="tocitem" href="../api.html">API Documentation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/master/docs/src/examples/rayleightaylor.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Example-5:-Rayleigh-Taylor-Instability"><a class="docs-heading-anchor" href="#Example-5:-Rayleigh-Taylor-Instability">Example 5: Rayleigh-Taylor Instability</a><a id="Example-5:-Rayleigh-Taylor-Instability-1"></a><a class="docs-heading-anchor-permalink" href="#Example-5:-Rayleigh-Taylor-Instability" title="Permalink"></a></h1>    <img src='../assets/rayleightaylor.png' alt='missing' width="50%" height="50%"><br><p>Rayleigh-Taylor is a very nice qualitative test where heavier fluid rest above a light fluid in a uniform gravitational field. This balance is obviously unstable and the fluids will try to minimize their potential by replacing each other. The transitional state often looks like a mushroom. You can get this in real life when you mix eg. coffee with milk. Some people believe this stuff is important and they made a <a href="https://en.wikipedia.org/wiki/Rayleigh%E2%80%93Taylor_instability">page on wikipedia</a> for it.</p><pre><code class="language-julia hljs">module rayleightaylor
+
+include(&quot;../src/LagrangianVoronoi.jl&quot;)
+using .LagrangianVoronoi
+
+const rho_d = 1.0 # density of lower fluid
+const rho_u = 1.8 # density of upper fluid
+const Re = 420.0 # Reynold number
+const Fr = 1.0 # Froude number
+const c = 20.0 # speed of sound
+const g = 1/(Fr^2) # gravitational acceleration
+const gamma = 1.4
+
+const xlims = (0.0, 1.0)
+const ylims = (0.0, 2.0)
+
+const N = 100 #resolution
+const dr = 1.0/N
+const h = 2*dr
+
+const v_char = 1.0
+const l_char = 1.0
+const dt = 0.1*dr/v_char
+const t_end =  5.0
+const nframes = 400
+
+const export_path = &quot;results/rayleightaylor&quot;</code></pre><p>Let us define some phase markers for upper and lower fluid. The phase markers must be non-negative integers.</p><pre><code class="language-julia hljs">const UP = 0
+const DOWN = 1</code></pre><p>Accelerate the instability with a good initial condition, where upper and lower fluid are divided by a sinusoid.</p><pre><code class="language-julia hljs">function dividing_curve(x::Float64)::Float64
+    return 1.0 - 0.15*sin(2*pi*x[1])
+end
+
+function ic!(p::VoronoiPolygon)
+    dy = dividing_curve(p.x[1])
+    p.phase = (p.x[2] &gt; dy ? 0 : 1)
+    p.rho = (p.phase == UP ? rho_u : rho_d)
+    p.mass = p.rho*area(p)
+    p.mu = p.rho/Re
+    p.P = rho_d*c^2/gamma
+    p.P -= max(p.x[2], dy)*rho_d*g
+    p.P -= min(0.0, p.x[2]-dy)*rho_u*g
+    p.e = p.P/(p.rho*(gamma - 1.0)) + g*p.x[2]
+end</code></pre><p>This time we need two different implicit solvers. The <code>psolver</code> is the good old pressure solver and projects velocity to a constraint space with zero divergence (or something similar in the compressible regime). The new <code>msolver</code> projects the repair velocity to a constraint space where it does not mess up the fluid phases. It is not so important, but had I not implemented it, those mathematical puritans would kick me from a <a href="https://en.wikipedia.org/wiki/Cantor_function">Cantor staircase</a> and stab me with a <a href="https://en.wikipedia.org/wiki/Weierstrass_function">Weierstrass function</a>.</p><pre><code class="language-julia hljs">mutable struct Simulation &lt;: SimulationWorkspace
+    grid::GridNS
+    psolver::PressureSolver{PolygonNS}
+    msolver::MultiphaseSolver{PolygonNS}
+    E::Float64
+    Simulation() = begin
+        domain = Rectangle(xlims = xlims, ylims = ylims)
+        grid = GridNS(domain, dr)
+        populate_lloyd!(grid, ic! = ic!)
+        return new(grid, PressureSolver(grid), MultiphaseSolver(grid), 0.0)
+    end
+end
+
+function step!(sim::Simulation, t::Float64)
+    move!(sim.grid, dt)
+    gravity_step!(sim.grid, -g*VECY, dt)
+    ideal_eos!(sim.grid)
+    find_pressure!(sim.psolver, dt)
+    pressure_step!(sim.grid, dt)
+    find_D!(sim.grid)
+    viscous_step!(sim.grid, dt)
+    find_dv!(sim.grid, dt)
+    multiphase_projection!(sim.msolver) # apply the multiphase solver
+    relaxation_step!(sim.grid, dt)
+    return
+end
+
+function postproc!(sim::Simulation, t::Float64)
+    sim.E = 0.0
+    for p in sim.grid.polygons
+        sim.E += p.mass*p.e
+    end
+    percent = round(100*t/t_end, digits = 5)
+    println(&quot;t = $t ($(percent)%)&quot;)
+    println(&quot;energy = $(sim.E)&quot;)
+    println()
+end
+
+function main()
+    sim = Simulation()
+    run!(sim, dt, t_end, step!,
+        path = export_path,
+        vtp_vars = (:rho, :P, :v, :phase), save_csv = false,
+        postproc! = postproc!,
+        nframes = nframes
+    )
+    return
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
+
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="doubleshear.html">« Example 4: Double Shear Layer</a><a class="docs-footer-nextpage" href="triplepoint.html">Example 6: Triple-point problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 26 September 2024 09:44">Thursday 26 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

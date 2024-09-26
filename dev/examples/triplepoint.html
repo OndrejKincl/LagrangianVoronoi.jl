@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 6: Triple-point problem · LagrangianVoronoi.jl</title><meta name="title" content="Example 6: Triple-point problem · LagrangianVoronoi.jl"/><meta property="og:title" content="Example 6: Triple-point problem · LagrangianVoronoi.jl"/><meta property="twitter:title" content="Example 6: Triple-point problem · LagrangianVoronoi.jl"/><meta name="description" content="Documentation for LagrangianVoronoi.jl."/><meta property="og:description" content="Documentation for LagrangianVoronoi.jl."/><meta property="twitter:description" content="Documentation for LagrangianVoronoi.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">LagrangianVoronoi.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="gresho.html">Example 1: Gresho Vortex Benchmark</a></li><li><a class="tocitem" href="cavity.html">Example 2: Lid-driven cavity</a></li><li><a class="tocitem" href="sedov.html">Example 3: Sedov Blast</a></li><li><a class="tocitem" href="doubleshear.html">Example 4: Double Shear Layer</a></li><li><a class="tocitem" href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li><li class="is-active"><a class="tocitem" href="triplepoint.html">Example 6: Triple-point problem</a></li><li><a class="tocitem" href="heat.html">Example 7: Rayleigh-Bénard Instability</a></li><li><a class="tocitem" href="taylorgreen.html">Example 8: Taylor-Green Vortex</a></li></ul></li><li><a class="tocitem" href="../api.html">API Documentation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="triplepoint.html">Example 6: Triple-point problem</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="triplepoint.html">Example 6: Triple-point problem</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/master/docs/src/examples/triplepoint.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Example-6:-Triple-point-problem"><a class="docs-heading-anchor" href="#Example-6:-Triple-point-problem">Example 6: Triple-point problem</a><a id="Example-6:-Triple-point-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Example-6:-Triple-point-problem" title="Permalink"></a></h1>    <img src='../assets/triplepoint.png' alt='missing' width="75%" height="50%" /><br><p>Triple point is a fancy benchmark which contains three separate gases with different properties. It is described in detail in this <a href="https://www.sciencedirect.com/science/article/pii/S0021999116000693">paper</a> and is essentially a two-dimensional version of a <a href="https://en.wikipedia.org/wiki/Riemann_problem">Riemann Problem</a>. Scientists like it just because it creates a very cool spiral.</p><pre><code class="language-julia hljs">module triplepoint
+
+include(&quot;../src/LagrangianVoronoi.jl&quot;)
+using .LagrangianVoronoi, Polyester
+
+
+const rho0 = 1.0
+const xlims = (0.0, 7.0)
+const ylims = (0.0, 3.0)
+const dr = 1e-2
+const nframes = 200
+const CFL = 0.1
+const v_char = 1.5
+const dt = CFL*dr/v_char
+const t_end = 3.0
+const export_path = &quot;results/triplepoint&quot;</code></pre><p>This struct helps to reduce the number of constant variables. Numbers <code>xmin, xmax, ymin, ymax</code> specify the rectangle where the phase is located at t = 0.</p><pre><code class="language-julia hljs">struct FluidPhase
+    label::Int      # phase label
+    rho::Float64    # initial density
+    P::Float64      # initial density
+    gamma::Float64  # adiabatic index
+    xmin::Float64
+    xmax::Float64
+    ymin::Float64
+    ymax::Float64
+end
+const phase1 = FluidPhase(1, 1, 1, 1.5, 0, 1, 0, 3)
+const phase2 = FluidPhase(2, 1, 0.1, 1.4, 1, 7, 0, 1.5)
+const phase3 = FluidPhase(3, 0.125, 0.1, 1.5, 1, 7, 1.5, 3)
+const fluidphases = [phase1, phase2, phase3]
+
+function ic!(p::VoronoiPolygon)
+    for fp in fluidphases
+        if (fp.xmin &lt;= p.x[1] &lt;= fp.xmax) &amp;&amp; (fp.ymin &lt;= p.x[2] &lt;= fp.ymax)
+            p.phase = fp.label
+            p.rho = fp.rho
+            p.P = fp.P
+            p.e = p.P/(p.rho*(fp.gamma - 1.0))
+            p.mass = p.rho*area(p)
+        end
+    end
+end</code></pre><p>Let us define our custom equation of state, which is different for every fluid phase. The <code>@batch</code> macro from the <code>Polyester</code> package makes it run in parallel. It is approximately godzillion times faster than <code>@threads</code>.</p><pre><code class="language-julia hljs">function multi_eos!(grid::VoronoiGrid)
+    @batch for p in grid.polygons
+        fp = fluidphases[p.phase]
+        p.rho = p.mass/area(p)
+        eps = p.e - 0.5*norm_squared(p.v)
+        p.P = (fp.gamma - 1.0)*p.rho*eps
+        p.c2 = fp.gamma*p.P/p.rho
+        if p.P &lt;= 0.0
+            throw(&quot;there was a negative pressure&quot;)
+        end
+    end
+end</code></pre><p>The rest of the script is just the standard procedure.</p><pre><code class="language-julia hljs">mutable struct Simulation &lt;: SimulationWorkspace
+    grid::GridNS
+    psolver::PressureSolver
+    msolver::MultiphaseSolver
+    E::Float64
+    S::Float64
+    E0::Float64
+    S0::Float64
+    quality::Float64
+    first_step::Bool
+    Simulation() = begin
+        domain = Rectangle(xlims = xlims, ylims = ylims)
+        grid = GridNS(domain, dr)
+        populate_hex!(grid, ic! = ic!)
+        psolver = PressureSolver(grid)
+        msolver = MultiphaseSolver(grid)
+    return new(grid, psolver, msolver, 0.0, 0.0, 0.0, 0.0, 0.0, true)
+    end
+end
+
+function step!(sim::Simulation, t::Float64)
+    move!(sim.grid, dt)
+    multi_eos!(sim.grid)
+    find_pressure!(sim.psolver, dt)
+    pressure_step!(sim.grid, dt)
+    find_D!(sim.grid)
+    viscous_step!(sim.grid, dt)
+    find_dv!(sim.grid, dt)
+    multiphase_projection!(sim.msolver)
+    relaxation_step!(sim.grid, dt)
+    return
+end
+
+
+function postproc!(sim::Simulation, t::Float64)
+    @show t
+    grid = sim.grid
+    sim.E = 0.0
+    sim.S = 0.0
+    sim.quality = Inf
+    for p in grid.polygons
+        fp = fluidphases[p.phase]
+        sim.E += p.mass*p.e
+        sim.S += p.mass*(log(abs(p.P)) - fp.gamma*log(abs(p.rho)))
+        sim.quality = min(sim.quality, p.quality)
+    end
+    if sim.first_step
+        sim.E0 = sim.E
+        sim.S0 = sim.S
+        sim.first_step = false
+    end
+    sim.E -= sim.E0
+    sim.S -= sim.S0
+    @show sim.E
+    @show sim.S
+    @show sim.quality
+    println()
+    return
+end
+
+function main()
+    sim = Simulation()
+    run!(sim, dt, t_end, step!;
+        postproc! = postproc!,
+        nframes = nframes,
+        path = export_path,
+        save_csv = false,
+        save_points = true,
+        save_grid = true,
+        vtp_vars = (:P, :v, :rho, :phase, :quality)
+    )
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
+
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="rayleightaylor.html">« Example 5: Rayleigh-Taylor Instability</a><a class="docs-footer-nextpage" href="heat.html">Example 7: Rayleigh-Bénard Instability »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Thursday 26 September 2024 09:44">Thursday 26 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
