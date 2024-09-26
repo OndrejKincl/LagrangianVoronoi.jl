@@ -15,6 +15,8 @@ jobs:
           julia --project=docs -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.activate(".")
+            Pkg.build()
             Pkg.instantiate()'
       - run: julia --project=docs docs/make.jl
         env:
