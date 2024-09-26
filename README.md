@@ -2,7 +2,7 @@
 
 <img src="docs/src/assets/voronoimesh.png" alt="" style="height: 400px"/>
 
-[Documentation](https://ondrejkincl.github.io/LagrangianVoronoi.jl/dev/index.html)
+[Documentation](https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/gh-pages/index.html)
 
 A numerical library for hydrodynamic simulations using Lagrangian Voronoi method in [Julia](https://julialang.org/). The idea is to enhance [SPH](https://en.wikipedia.org/wiki/Smoothed-particle_hydrodynamics) using a moving [Voronoi mesh](https://en.wikipedia.org/wiki/Voronoi_diagram). This allows for consistent gradient approximations and simplifies some boundary conditions. Also, the Voronoi mesh makes a smaller stencil, which means that the interactions between particles are in some sense *more* local, leading to sparser matrices and faster computations. The code runs reasonable well in parallel (shared memory) and uses semi-implicit time-marching scheme. It can handle both compressible and incompressible fluids, shocks, multi-phase flows and fluids with heat conduction. Periodic, no-slip and free-slip boundary conditions are supported.
 
