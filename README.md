@@ -1,4 +1,7 @@
-# LagrangainVoronoi.jl
+LagrangainVoronoi.jl
+====================
+
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://OndrejKincl.github.io/LagrangianVoronoi.jl/dev)
 
 <img src="docs/src/assets/voronoimesh.png" alt="" style="height: 400px"/>
 
@@ -38,9 +41,6 @@ Clone this repository. Open the `examples` folder and run this from your termina
 julia -t 1 gresho.jl
 ```
 You may replace `1` with the number of threads available on your PC. Wait for the simulation to finish. To see the results, download [paraview](https://www.paraview.org/download/). Use it to open the `result.pvd` file. You may try any other example but some require long time to compute. Also note pictures in documentation are sometimes made with higher than default resolution.
-
-## Documentation
-[Is here.](https://ondrejkincl.github.io/LagrangianVoronoi.jl/dev/index.html)
 
 ## Citing
 If you use this code in your thesis or research paper, please cite: 
