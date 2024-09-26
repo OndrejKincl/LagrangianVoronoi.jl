@@ -9,7 +9,7 @@ A numerical library for hydrodynamic simulations using Lagrangian Voronoi method
 
 The main limitation is the lack of surface tension, free surface conditions and difficulties with mutli-phase problems featuring high density ratios (for example in water and air interface, the density ratio is 800:1, and that is challenging for the numerics). Also, the code is currently only 2D and we cannot prescribe inflow and outflow conditions. We hope to adress these problems in near future. The computational domain must be a rectangle, but complex geometries can be implemented indirectly with the help of dummy particles (TODO).
 
-If you are interested in the beautiful math behind this method, you can have a look at [our paper](https://arxiv.org/abs/2405.04116).
+If you are interested in the beautiful math behind this method, you can have a look at [our paper](https://onlinelibrary.wiley.com/doi/full/10.1002/fld.5339).
 
 If you have any suggestions or comments, feel free to raise an issue via the GitHub interface or contact me at ondrej.kincl@unitn.it. 
 
@@ -46,10 +46,11 @@ You may replace `1` with the number of threads available on your PC. Wait for th
 If you use this code in your thesis or research paper, please cite: 
 ```
 @article{kincl2024semi,
-  title={Semi-implicit Lagrangian Voronoi Approximation for the incompressible Navier-Stokes equations},
+  title={Semi-implicit Lagrangian Voronoi approximation for the incompressible Navier--Stokes equations},
   author={Kincl, Ond{\v{r}}ej and Peshkov, Ilya and Boscheri, Walter},
-  journal={arXiv preprint arXiv:2405.04116},
-  year={2024}
+  journal={International Journal for Numerical Methods in Fluids},
+  year={2024},
+  publisher={Wiley Online Library}
 }
 ```
 ## Other libraries
