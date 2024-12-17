@@ -18,12 +18,13 @@ const rho = 100.0
 const Mu = 10.0
 const mu = 1.0
 const dr = R/15
-const v_char = 0.5*R
-const dt = 0.01*dr/v_char
-const t_end = 1.0
+const v_char = 1.25
+const dt = 0.1*dr/v_char
+const t_end = 3.0
 const nframes = 100
 const g = 0.98
 const st = 24.5
+const smoothing_length = 3dr
 
 
 const export_path = "results/bubble"
@@ -49,8 +50,8 @@ mutable struct Simulation <: SimulationWorkspace
     grid::GridMulti
     solver::PressureSolver{PolygonMulti}
     viscous_solver::ViscousSolver{PolygonMulti}
-    bubble_y::Float64
-    bubble_vy::Float64
+    bubble_y::Float64 # y-coordinate of the bubble centroid
+    bubble_vy::Float64 # bubble rising speed
     Simulation() = begin
         domain = Rectangle(xlims = xlims, ylims = ylims)
         grid = GridMulti(domain, dr)
@@ -75,10 +76,10 @@ function step!(sim::Simulation, t::Float64)
     viscous_step!(sim.viscous_solver, dt)
     bdary_friction!(sim.grid, vDirichlet, dt, charfun=top_and_bottom)
     gravity_step!(sim.grid, -g*VECY, dt)
-    surface_tension!(sim.grid, dt, 3dr)
+    surface_tension!(sim.grid, dt, smoothing_length)
     find_pressure!(sim.solver, dt)
     pressure_step!(sim.grid, dt)
-    phase_preserving_remapping!(sim.grid, dt)
+    phase_preserving_remapping!(sim.grid, dt, smoothing_length)
 end
 
 function postproc!(sim::Simulation, t::Float64)
@@ -95,6 +96,8 @@ function postproc!(sim::Simulation, t::Float64)
     sim.bubble_y /= bubble_area
     sim.bubble_vy /= bubble_area
     @show t
+    println("y = $(sim.bubble_y)")
+    println("v = $(sim.bubble_vy)")
     println()
 end
 
