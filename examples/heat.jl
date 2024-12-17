@@ -70,7 +70,7 @@ end
 # Fourier diffusion in our time-marching scheme. 
 
 mutable struct Simulation <: SimulationWorkspace
-    grid::GridNS
+    grid::GridNSF
     solver::PressureSolver{PolygonNSF}
     E::Float64
     S::Float64
@@ -79,7 +79,7 @@ mutable struct Simulation <: SimulationWorkspace
         xlims = (0.0, W)
         ylims = (0.0, H)
         domain = Rectangle(xlims = xlims, ylims = ylims)
-        grid = GridNS(domain, dr, xperiodic = true)
+        grid = GridNSF(domain, dr, xperiodic = true)
         populate_lloyd!(grid, ic! = exp_atmo!)
         return new(grid, PressureSolver(grid), 0.0, 0.0, 0.0)
     end

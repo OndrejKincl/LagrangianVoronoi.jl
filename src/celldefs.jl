@@ -15,6 +15,7 @@ macro Euler_vars()
         dv::RealVector = VEC0 # repair velocity (used for mesh relaxation step)
 
         # extensive vars
+        area::Float64 = 0.0
         mass::Float64 = 0.0
         momentum::RealVector = VEC0
         energy::Float64 = 0.0
@@ -61,30 +62,14 @@ const GridNSF = VoronoiGrid{PolygonNSF}
     PolygonMulti(; x::RealVector, kwargs...)
     
 Predefined Voronoi Polygon for Navier-Stokes equations with implicit viscosity,
-optimized for multiphase problems with high density ratios.
+optimized for multiphase problems with high density ratios, including surface tension.
 Mandatory keyword variable `x` is the position of the generating seed.
 """
 @kwdef mutable struct PolygonMulti <: VoronoiPolygon
     @Euler_vars
-    mu::Float64    = 0.0     # dynamic viscosity
-    color::Float64 = 0.0     # smoothed coloring function
+    mu::Float64    = 0.0      # dynamic viscosity
+    cgrad::RealVector = VEC0  # coloring function gradient
+    st::Float64    = 0.0      # surface tension coefficient
 end
 
 const GridMulti = VoronoiGrid{PolygonMulti}
-
-"""
-    PolygonMultiTension(; x::RealVector, kwargs...)
-    
-Predefined Voronoi Polygon for Navier-Stokes equations with implicit viscosity,
-optimized for multiphase problems with high density ratios and with surface tension.
-Mandatory keyword variable `x` is the position of the generating seed.
-"""
-@kwdef mutable struct PolygonMultiTension <: VoronoiPolygon
-    @Euler_vars
-    mu::Float64    = 0.0     # dynamic viscosity
-    color::Float64 = 0.0     # smoothed coloring function
-    color_grad::RealVector = VEC0 # color function gradient
-    st::Float64    = 0.0     # surface tension coefficient
-end
-
-const GridMultiTension = VoronoiGrid{PolygonMultiTension}
