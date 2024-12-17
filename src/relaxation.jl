@@ -67,7 +67,9 @@ function relaxation_step!(grid::VoronoiGrid, dt::Float64; rusanov::Bool = true)
     @batch for p in grid.polygons
         p.v = p.momentum/p.mass
         p.e = p.energy/p.mass
+        p.x += dt*p.dv
     end
+    remesh!(grid)
 end
 
 """
