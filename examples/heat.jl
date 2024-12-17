@@ -71,7 +71,7 @@ end
 
 mutable struct Simulation <: SimulationWorkspace
     grid::GridNS
-    solver::PressureSolver{PolygonNS}
+    solver::PressureSolver{PolygonNSF}
     E::Float64
     S::Float64
     E_kinetic::Float64

@@ -62,9 +62,12 @@ is not equipped with a vorticity field. However, we can create our custom
 type `PolygonWithVorticity` and perform all computations with it.  
 =#
 @kwdef mutable struct PolygonWithVorticity <: VoronoiPolygon
-    @fluid_variables    # all standard variables
-    vort::Float64 = 0.0 # vorticity
+    @Euler_vars           # all standard variables
+    D::RealMatrix = MAT0  # velocity deformation tensor
+    mu::Float64 = 0.0     # dynamic viscosity
+    vort::Float64 = 0.0   # vorticity
 end
+
 const GridWithVorticity = VoronoiGrid{PolygonWithVorticity}
 
 mutable struct Simulation <: SimulationWorkspace

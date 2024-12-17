@@ -44,7 +44,7 @@ include("simulation.jl")
 export SimulationWorkspace, run!, movingavg
 
 include("celldefs.jl")
-export GridNS, PolygonNS, @fluid_variables
+export @Euler_vars, PolygonNS, GridNS, PolygonNSF, GridNSF, PolygonMulti, GridMulti, PolygonMultiTension, GridMultiTension
 
 include("move.jl")
 export move!
@@ -60,7 +60,5 @@ export find_dv!, relaxation_step!, MultiphaseSolver, multiphase_projection!
 
 include("fourier.jl")
 export ideal_temperature!, fourier_step!, heat_from_bdary!
-
-
 
 end
