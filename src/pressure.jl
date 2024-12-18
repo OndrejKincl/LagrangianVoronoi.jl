@@ -9,7 +9,6 @@ Update the velocity and energy by the pressure field. This assumes that pressure
 """
 function pressure_step!(grid::VoronoiGrid, dt::Float64)  
     @batch for p in grid.polygons
-        p.area = area(p)
         for (q,e,y) in neighbors(p, grid)
             lrr = lr_ratio(p.x-y,e)
             m = midpoint(e)
@@ -106,10 +105,9 @@ function refresh!(A::PressureOperator, grid::VoronoiGrid, dt::Float64)
     @batch for i in 1:A.n
         begin
             p = grid.polygons[i]
-            area = area(p)
             empty!(A.neighbors[i])
             empty!(A.lr_ratios[i])
-            A.diagonal[i] = area/(p.rho*p.c2*dt^2)
+            A.diagonal[i] = p.mass/(p.rho^2*p.c2*dt^2)
             for (q,e,y) in neighbors(p, grid)
                 push!(A.neighbors[i], e.label)
                 push!(A.lr_ratios[i], lr_ratio(p.x - y, e)*(0.5/p.rho + 0.5/q.rho))
@@ -170,7 +168,6 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool, boundary_v
         @inbounds begin
             p = grid.polygons[i]
             A = area(p)
-            #p.rho = p.mass/area(p)
             b[i] = A*p.P/(p.rho*p.c2*dt^2)
             P[i] = p.P # serves as an initial guess
             GP[i] = VEC0
@@ -185,7 +182,7 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool, boundary_v
                 vbc = boundary_velocity(midpoint(e), e.label)
                 b[i] -= dot(dS, vbc - p.v)/dt
             end 
-            GP[i] /= A*p.rho
+            GP[i] /= p.mass
         end
     end
     # explicit part of the pressure laplacian

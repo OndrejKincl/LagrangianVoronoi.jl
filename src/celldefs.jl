@@ -15,7 +15,6 @@ macro Euler_vars()
         dv::RealVector = VEC0 # repair velocity (used for mesh relaxation step)
 
         # extensive vars
-        area::Float64 = 0.0
         mass::Float64 = 0.0
         momentum::RealVector = VEC0
         energy::Float64 = 0.0
