@@ -1,7 +1,7 @@
 """
     move!(grid::VoronoiGrid, dt::Float64)
 
-Update the positions of all polygons, moving each by `dt*(p.v + p.dv)`. 
+Update the positions of all polygons, moving each by `dt*p.v`. 
 The function ensures that points will never escape the computational domain (this would lead to undefined behavior).
 If the grid is peridoic, points will be wrapped around automatically.
 The grid is remeshed after this update.
@@ -21,11 +21,10 @@ function move!(grid::VoronoiGrid, dt::Float64)
 end
 
 function try_move!(grid::VoronoiGrid, p::VoronoiPolygon, dt::Float64)::Bool
-    v_tot = p.v + p.dv
-    if any(isnan, v_tot)
+    if any(isnan, p.v)
         throw("Velocity field invalidated.") 
     end
-    _x = periodic_wrap(grid, p.x + dt*v_tot)
+    _x = periodic_wrap(grid, p.x + dt*p.v)
     if isinside(grid.boundary_rect, _x)
         p.x = _x
         return true

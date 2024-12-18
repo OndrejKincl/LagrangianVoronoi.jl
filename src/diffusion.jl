@@ -61,11 +61,12 @@ It cannot be used for inflows or outflows.
 The function `vDirichlet` should accept a single argument `x::RealVector` and
 return a `RealVector` corresponding to the velocity of the boundary.
 """
-function bdary_friction!(grid::VoronoiGrid, vDirichlet::Function, dt::Float64)
+function bdary_friction!(grid::VoronoiGrid, vDirichlet::Function, dt::Float64; charfun::Function = _everywhere)
     @batch for p in grid.polygons
         tmp = 1.0
         for e in boundaries(p)
             m = 0.5*(e.v1 + e.v2)
+            if !charfun(m) continue end
             n = normal_vector(e)
             lrr = len(e)/abs(dot(m - p.x, n))
             f = p.mu*lrr*vDirichlet(m)/p.mass

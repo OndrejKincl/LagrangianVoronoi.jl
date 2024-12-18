@@ -1,5 +1,6 @@
 import Base: eltype, size
 import LinearAlgebra: mul!
+import SmoothedParticles:wendland2
 
 """
     pressure_step!(grid::VoronoiGrid, dt::Float64)  
@@ -11,14 +12,14 @@ function pressure_step!(grid::VoronoiGrid, dt::Float64)
         for (q,e,y) in neighbors(p, grid)
             lrr = lr_ratio(p.x-y,e)
             m = midpoint(e)
-            p.v += dt*lrr/p.mass*(p.P - q.P)*(m - p.x)
+            p.v += dt/(p.mass)*lrr*(p.P - q.P)*(m - p.x)
         end
     end
     @batch for p in grid.polygons
         for (q,e,y) in neighbors(p, grid)
             lrr = lr_ratio(p.x-y,e)
             m = midpoint(e)
-            p.e -= dt*lrr/p.mass*(dot(m - p.x, p.P*p.v) - dot(m - y, q.P*q.v))
+            p.e -= dt*lrr/(p.mass)*(dot(m - p.x, p.P*p.v) - dot(m - y, q.P*q.v))
         end
     end
 end
@@ -30,6 +31,12 @@ Return the internal energy of a Voronoi Polygon.
 """
 function eint(p::VoronoiPolygon)::Float64 
     return p.e - 0.5*norm_squared(p.v)
+end
+
+function find_rho!(grid::VoronoiGrid) 
+    @batch for p in grid.polygons
+        p.rho = p.mass/area(p)
+    end
 end
 
 """
@@ -70,7 +77,7 @@ Update velocity field and specific energy by a gravitational force.
 function gravity_step!(grid::VoronoiGrid, g::RealVector, dt::Float64)
     @batch for p in grid.polygons
         p.v += dt*g
-        p.e += dot(dt*g, p.v)
+        #p.e += dot(dt*g, p.v)
     end
 end
 
@@ -152,7 +159,7 @@ struct PressureSolver{T}
 end
 
 # Update the pressure solver when the mesh or physical field change.
-function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
+function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool, boundary_velocity::Function)
     grid = solver.grid
     b = solver.b
     P = solver.P
@@ -160,17 +167,21 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     @batch for i in eachindex(grid.polygons)
         @inbounds begin
             p = grid.polygons[i]
-            p.rho = p.mass/area(p)
-            b[i] = p.mass*p.P/(p.rho^2*p.c2*dt^2)
+            A = area(p)
+            b[i] = A*p.P/(p.rho*p.c2*dt^2)
             P[i] = p.P # serves as an initial guess
             GP[i] = VEC0
             for (q,e,y) in neighbors(p, grid)
                 lrr = lr_ratio(p.x-y,e)
                 m = midpoint(e)
-                z = midpoint(p.x,y)
-                b[i] -= (lrr/dt)*(dot(p.v - q.v, m-z) - 0.5*dot(p.v + q.v, p.x-y))
+                b[i] -= (lrr/dt)*dot(p.v - q.v, m-y)
                 GP[i] -= lrr*(p.P - q.P)*(m - p.x)
             end
+            for e in boundaries(p)
+                dS = RealVector(e.v1[2]-e.v2[2], e.v2[1]-e.v1[1])
+                vbc = boundary_velocity(midpoint(e), e.label)
+                b[i] -= dot(dS, vbc - p.v)/dt
+            end 
             GP[i] /= p.mass
         end
     end
@@ -191,19 +202,23 @@ function refresh!(solver::PressureSolver, dt::Float64, gp_step::Bool)
     end
 end
 
+function zero_vbc(_::RealVector, _::Int)::RealVector
+    return VEC0
+end
+
 """
     find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64)
 
 Find the estimated value of pressure field at the next time step. 
 Integer `niter` is the number fixed point iteratrions.
 """ 
-function find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64 = 5)
+function find_pressure!(solver::PressureSolver, dt::Float64, niter::Int64 = 10; boundary_velocity::Function = zero_vbc)
     refresh!(solver.A, solver.grid, dt)
     for it in 1:niter
-        refresh!(solver, dt, (it > 1))
+        refresh!(solver, dt, (it > 1), boundary_velocity)
         minres!(solver.ms, solver.A, solver.b, solver.P; verbose = Int(solver.verbose), atol = 1e-6, rtol = 1e-6, itmax = 1000)
         P = solution(solver.ms)
-        for i in eachindex(P)
+        @batch for i in eachindex(P)
             @inbounds solver.grid.polygons[i].P = P[i]
         end
     end

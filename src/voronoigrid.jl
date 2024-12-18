@@ -16,7 +16,7 @@ mutable struct VoronoiGrid{T}
     h::Float64
     rr_max::Float64
     boundary_rect::Rectangle
-    extended_rect::Rectangle
+    cropping_rect::Rectangle
     cell_list::CellList
     polygons::Vector{T}
     xperiodic::Bool
@@ -26,19 +26,19 @@ mutable struct VoronoiGrid{T}
     VoronoiGrid{T}(boundary_rect::Rectangle, dr::Float64;
     h = 2dr, r_max = 10dr,
     xperiodic::Bool = false, yperiodic::Bool = false) where T = begin
-        extended_xmin = boundary_rect.xmin - r_max*xperiodic*VECX - r_max*yperiodic*VECY
-        extended_xmax = boundary_rect.xmax + r_max*xperiodic*VECX + r_max*yperiodic*VECY
+        cropping_xmin = boundary_rect.xmin - r_max*xperiodic*VECX - r_max*yperiodic*VECY
+        cropping_xmax = boundary_rect.xmax + r_max*xperiodic*VECX + r_max*yperiodic*VECY
         xperiod = boundary_rect.xmax[1] - boundary_rect.xmin[1]
         yperiod = boundary_rect.xmax[2] - boundary_rect.xmin[2]
-        extended_rect = Rectangle(extended_xmin, extended_xmax)
-        cell_list = CellList(h, extended_rect)
+        cropping_rect = Rectangle(cropping_xmin, cropping_xmax)
+        cell_list = CellList(h, cropping_rect)
         polygons = T[]
         return new{T}(
             dr,
             h,
             r_max^2,
             boundary_rect, 
-            extended_rect,
+            cropping_rect,
             cell_list, 
             polygons,
             xperiodic,
@@ -95,7 +95,7 @@ is populated and each the Voronoi generators move in space.
     @inbounds begin
         @batch for i in eachindex(grid.polygons)
             poly = grid.polygons[i]
-            reset!(poly, grid.extended_rect)
+            reset!(poly, grid.cropping_rect)
             insert_periodic!(grid, poly.x, i)
         end
         # cut all voronoi cells
