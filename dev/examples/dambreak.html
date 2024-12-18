@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 10: Dam break · LagrangianVoronoi.jl</title><meta name="title" content="Example 10: Dam break · LagrangianVoronoi.jl"/><meta property="og:title" content="Example 10: Dam break · LagrangianVoronoi.jl"/><meta property="twitter:title" content="Example 10: Dam break · LagrangianVoronoi.jl"/><meta name="description" content="Documentation for LagrangianVoronoi.jl."/><meta property="og:description" content="Documentation for LagrangianVoronoi.jl."/><meta property="twitter:description" content="Documentation for LagrangianVoronoi.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">LagrangianVoronoi.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="gresho.html">Example 1: Gresho Vortex Benchmark</a></li><li><a class="tocitem" href="cavity.html">Example 2: Lid-driven cavity</a></li><li><a class="tocitem" href="sedov.html">Example 3: Sedov Blast</a></li><li><a class="tocitem" href="doubleshear.html">Example 4: Double Shear Layer</a></li><li><a class="tocitem" href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li><li><a class="tocitem" href="triplepoint.html">Example 6: Triple-point problem</a></li><li><a class="tocitem" href="heat.html">Example 7: Rayleigh-Bénard Instability</a></li><li><a class="tocitem" href="taylorgreen.html">Example 8: Taylor-Green Vortex</a></li><li><a class="tocitem" href="piston.html">Example 8: Saltzman piston test</a></li><li><a class="tocitem" href="cpatch.html">Example 9: Circular patch problem</a></li><li class="is-active"><a class="tocitem" href="dambreak.html">Example 10: Dam break</a></li><li><a class="tocitem" href="rotsquare.html">Example 11: Rotating square</a></li><li><a class="tocitem" href="bubble.html">Example 12: Rising bubble</a></li></ul></li><li><a class="tocitem" href="../api.html">API Documentation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="dambreak.html">Example 10: Dam break</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="dambreak.html">Example 10: Dam break</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/master/docs/src/examples/dambreak.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Example-10:-Dam-break"><a class="docs-heading-anchor" href="#Example-10:-Dam-break">Example 10: Dam break</a><a id="Example-10:-Dam-break-1"></a><a class="docs-heading-anchor-permalink" href="#Example-10:-Dam-break" title="Permalink"></a></h1>    <img src='../assets/dambreak.png' alt='missing' width="50%"><br><p>We follow with a dam break test, where a column of fluid collapses under its weight in uniform gravitational field. This is typically simulated by a free surface code, but a multiphase approach is more realistic (it does not have those vanishing air pockets). It is possible to extract numeric data from this test (the x-coordinate of the wavefront and the height of the water column) and compare them to a reference solution or <a href="https://www.tandfonline.com/doi/abs/10.13182/NSE96-A24205">experiment</a>.</p><pre><code class="language-julia hljs">module dambreak
+include(&quot;../src/LagrangianVoronoi.jl&quot;)
+using .LagrangianVoronoi
+
+using StaticArrays
+using Plots
+using Parameters
+using Base.Threads
+using WriteVTK
+using LinearAlgebra
+using Polyester
+using SmoothedParticles:wendland2
+using CSV, DataFrames
+
+# physical
+const dr = 0.03
+const Rho = 1000.0   	  # water density
+const rho = 1.25          # air density
+const g = 9.8             # gravitational acceleration
+const Mu = 8.9e-4         # dynamic viscosity of water
+const mu = 3.7e-5         # dynamic viscosity of air
+const smoothing_length = 3dr
+
+# geometrical
+const water_column_width = 1.0
+const water_column_height = 2.0
+const box_height = 3.0
+const box_width = 4.0
+const xlims = (0.0, box_width)
+const ylims = (0.0, box_height)
+
+# temporal
+const v_char = 15.0
+const dt = 0.1*dr/v_char
+const t_end = 1.0
+const nframes = 200
+const export_path = &quot;results/dambreak&quot;
+
+const WATER = 0
+const AIR = 1
+
+function iswater(x::RealVector)::Bool
+    return (x[1] &lt; water_column_width) &amp;&amp; (x[2] &lt; water_column_height)
+end
+
+function ic!(p::VoronoiPolygon)
+    p.phase = (iswater(p.x) ? WATER : AIR)
+    p.rho = (p.phase == WATER ? Rho : rho)
+    p.c2 = 100.0^2
+    p.mass = p.rho*area(p)
+    p.mu = (p.phase == WATER ? Mu : mu)
+end
+
+mutable struct Simulation &lt;: SimulationWorkspace
+    grid::GridNS
+    solver::PressureSolver
+    viscous_solver::ViscousSolver
+    E::Float64
+    momX::Float64 # the total x momentum
+    momY::Float64 # the total y momentum
+    X::Float64    # x-coordinate of wavefront (dimensionless)
+    H::Float64    # height of the water column (dimensionless)
+    t_char::Float64
+    Simulation() = begin
+        domain = Rectangle(xlims = xlims, ylims = ylims)
+        grid = GridNS(domain, dr)
+        populate_rect!(grid, ic! = ic!)
+        return new(
+            grid,
+            PressureSolver(grid, verbose=false),
+            ViscousSolver(grid),
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0
+        )
+    end
+end
+
+function step!(sim::Simulation, t::Float64)
+    move!(sim.grid, dt)
+    find_rho!(sim.grid)
+    viscous_step!(sim.viscous_solver, dt)
+    gravity_step!(sim.grid, -g*VECY, dt)
+    find_pressure!(sim.solver, dt)
+    pressure_step!(sim.grid, dt)
+    phase_preserving_remapping!(sim.grid, dt, smoothing_length)
+end
+
+function postproc!(sim::Simulation, t::Float64)
+    sim.E = 0.0
+    sim.momX = 0.0
+    sim.momY = 0.0
+    sim.X = -Inf
+    sim.H = -Inf
+    sim.t_char = t*sqrt(2g/water_column_width)
+    for p in sim.grid.polygons
+        if p.phase == WATER
+            sim.E += 0.5*p.mass*norm_squared(p.v) + p.mass*g*p.x[2]
+            sim.momX += p.mass*p.v[1]
+            sim.momY += p.mass*p.v[2]
+			sim.X = max(sim.X, p.x[1]/water_column_width)
+			sim.H = max(sim.H, p.x[2]/water_column_height)
+        end
+    end
+    percent = round(100*t/t_end, digits = 5)
+    println(&quot;t = $t ($(percent)%)&quot;)
+    println(&quot;energy = $(sim.E)&quot;)
+    println(&quot;momX = $(sim.momX)&quot;)
+    println(&quot;momY = $(sim.momY)&quot;)
+    @show sim.X
+    @show sim.H
+    println()
+end
+
+function main()
+    sim = Simulation()
+    run!(sim, dt, t_end, step!,
+        path = export_path,
+        vtp_vars = (:rho, :P, :v, :phase),
+        csv_vars = (:X, :H, :t_char),
+        save_points = true,
+        postproc! = postproc!,
+        nframes = nframes
+    )
+    make_plot()
+end
+
+function make_plot()
+	data = CSV.read(export_path*&quot;/simdata.csv&quot;, DataFrame)
+	X_VIO = CSV.read(&quot;reference/dambreak_X_Violeau.csv&quot;, DataFrame)
+	X_KOS = CSV.read(&quot;reference/dambreak_X_Koshizuka.csv&quot;, DataFrame)
+	H_VIO = CSV.read(&quot;reference/dambreak_H_Violeau.csv&quot;, DataFrame)
+	H_KOS = CSV.read(&quot;reference/dambreak_H_Koshizuka.csv&quot;, DataFrame)
+	p1 = plot(data.t_char, data.X, label = &quot;Voronoi&quot;, xlims = (0., 3.0))
+	scatter!(p1, X_VIO.time, X_VIO.X, label = &quot;SPH&quot;)
+	scatter!(p1, X_KOS.time, X_KOS.X, label = &quot;Koshizuka&amp;Oda&quot;, markershape = :square)
+	savefig(p1, export_path*&quot;/dambreak_X.pdf&quot;)
+	p2 = plot(data.t_char, data.H, label = &quot;Voronoi&quot;, xlims = (0., 3.0))
+	scatter!(p2, H_VIO.time, H_VIO.H, label = &quot;SPH&quot;)
+	scatter!(p2, H_KOS.time, H_KOS.H, label = &quot;Koshizuka&amp;Oda&quot;, markershape = :square)
+	savefig(p2, export_path*&quot;/dambreak_H.pdf&quot;)
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
+
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="cpatch.html">« Example 9: Circular patch problem</a><a class="docs-footer-nextpage" href="rotsquare.html">Example 11: Rotating square »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Wednesday 18 December 2024 14:58">Wednesday 18 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

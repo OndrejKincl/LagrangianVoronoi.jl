@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 8: Saltzman piston test · LagrangianVoronoi.jl</title><meta name="title" content="Example 8: Saltzman piston test · LagrangianVoronoi.jl"/><meta property="og:title" content="Example 8: Saltzman piston test · LagrangianVoronoi.jl"/><meta property="twitter:title" content="Example 8: Saltzman piston test · LagrangianVoronoi.jl"/><meta name="description" content="Documentation for LagrangianVoronoi.jl."/><meta property="og:description" content="Documentation for LagrangianVoronoi.jl."/><meta property="twitter:description" content="Documentation for LagrangianVoronoi.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">LagrangianVoronoi.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="gresho.html">Example 1: Gresho Vortex Benchmark</a></li><li><a class="tocitem" href="cavity.html">Example 2: Lid-driven cavity</a></li><li><a class="tocitem" href="sedov.html">Example 3: Sedov Blast</a></li><li><a class="tocitem" href="doubleshear.html">Example 4: Double Shear Layer</a></li><li><a class="tocitem" href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li><li><a class="tocitem" href="triplepoint.html">Example 6: Triple-point problem</a></li><li><a class="tocitem" href="heat.html">Example 7: Rayleigh-Bénard Instability</a></li><li><a class="tocitem" href="taylorgreen.html">Example 8: Taylor-Green Vortex</a></li><li class="is-active"><a class="tocitem" href="piston.html">Example 8: Saltzman piston test</a></li><li><a class="tocitem" href="cpatch.html">Example 9: Circular patch problem</a></li><li><a class="tocitem" href="dambreak.html">Example 10: Dam break</a></li><li><a class="tocitem" href="rotsquare.html">Example 11: Rotating square</a></li><li><a class="tocitem" href="bubble.html">Example 12: Rising bubble</a></li></ul></li><li><a class="tocitem" href="../api.html">API Documentation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="piston.html">Example 8: Saltzman piston test</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="piston.html">Example 8: Saltzman piston test</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/master/docs/src/examples/piston.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Example-8:-Saltzman-piston-test"><a class="docs-heading-anchor" href="#Example-8:-Saltzman-piston-test">Example 8: Saltzman piston test</a><a id="Example-8:-Saltzman-piston-test-1"></a><a class="docs-heading-anchor-permalink" href="#Example-8:-Saltzman-piston-test" title="Permalink"></a></h1>    <img src='../assets/piston.png' alt='missing' width="50%" height="50%"><br><p>In this <a href="https://www.sciencedirect.com/science/article/pii/S0021999117304679">challenging test</a>, the domain will vary with time. We study a piston of length 1 and width 0.1 filled with ideal gas which is initially at rest. Starting from <span>$t=0$</span>, the piston is compressed at a uniform rate at speed equal to 1. This produces a strong shockwave, whose characteristics can be computed analytically from Rankine-Hugeniot conditions. The simulation is terminated at <span>$t = t_end$</span>. Unknown things will happen if <span>$t_end &gt;= 1.0$</span>, maybe it will even destroy the universe!</p><pre><code class="language-julia hljs">module piston
+include(&quot;../src/LagrangianVoronoi.jl&quot;)
+using .LagrangianVoronoi, WriteVTK, LinearAlgebra, Polyester
+using LaTeXStrings, DataFrames, CSV, Plots, Measures, Match
+
+const xlims = (0.0, 1.0)
+const ylims = (0.0, 0.1)
+const rho0 = 1.0
+const P0 = 1e-4
+const gamma = 5/3
+const dr = 1/100
+
+const CFL_early = 0.1
+const t_early = 0.01
+const CFL = 0.1
+
+const t_end = 0.6
+const nframes = 100
+
+const export_path = &quot;results/piston&quot;
+
+function ic!(p::VoronoiPolygon)
+    p.rho = rho0
+    p.mass = p.rho*area(p)
+    p.P = P0
+    p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+end
+
+function cut_domain!(grid::VoronoiGrid, t::Float64)
+    rect = Rectangle(xlims = (t, 1.0), ylims = ylims)
+    grid.boundary_rect = rect
+    grid.cropping_rect = rect
+    remesh!(grid)
+    @batch for p in grid.polygons</code></pre><p>change density adiabatically</p><pre><code class="language-julia hljs">        if isleftbdarycell(p)
+            rho_old = p.rho
+            P_old = p.P
+            p.rho = p.mass/area(p)
+            p.P = P_old*(p.rho/rho_old)^gamma
+            p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+        end
+    end
+end
+
+function isleftbdarycell(p::VoronoiPolygon)::Bool
+    for e in boundaries(p)
+        if e.label == BDARY_LEFT
+            return true
+        end
+    end
+    return false
+end
+
+function dirichlet_bc!(grid::VoronoiGrid)
+    @batch for p in grid.polygons
+        if isleftbdarycell(p)
+            p.v = VECX + p.v[2]*VECY
+            p.e = 0.5*norm_squared(p.v) + p.P/(p.rho*(gamma - 1.0))
+        end
+    end
+end
+
+
+function move_points!(grid::VoronoiGrid,  t::Float64, dt::Float64)
+    @batch for p in grid.polygons
+        p.x += dt*p.v
+    end
+    remesh!(grid)
+end
+
+
+function populate_skewed!(grid::VoronoiGrid{T}; ic!::Function) where T &lt;: VoronoiPolygon
+    N = round(Int, 1.0/grid.dr)
+    M = round(Int, 0.1/grid.dr)
+    for x1 in range(-1.0, 2.0, 3N)
+        for x2 in range(0.0, 0.1, M)
+            x = RealVector(x1, x2) + 0.5*RealVector(grid.dr, grid.dr)
+            x = RealVector(x[1] + (0.1 - x[2])*sin(pi*x[1]), x[2])
+            if isinside(grid.boundary_rect, x)
+                push!(grid.polygons, T(x=x))
+            end
+        end
+    end
+    remesh!(grid)
+    @batch for p in grid.polygons
+        ic!(p)
+    end
+	return
+end
+
+mutable struct Simulation &lt;: SimulationWorkspace
+    grid::GridNS
+    solver::PressureSolver
+    E::Float64
+    S::Float64
+    t::Float64
+    Simulation() = begin
+        domain = Rectangle(xlims = xlims, ylims = ylims)
+        grid = GridNS(domain, dr)
+        populate_skewed!(grid, ic! = ic!)
+        solver = PressureSolver(grid)
+        dirichlet_bc!(grid)
+        return new(grid, solver, 0.0, 0.0, 0.0)
+    end
+end
+
+function vbc(_::RealVector, bdary::Int)::RealVector
+    if bdary == BDARY_LEFT
+        return VECX
+    end
+    return VEC0
+end
+
+
+function step!(sim::Simulation)
+    dt = (sim.t &lt; t_early ? CFL_early : CFL)*dr
+    ideal_eos!(sim.grid, gamma; Pmin = P0)
+    find_pressure!(sim.solver, dt; boundary_velocity = vbc)
+    pressure_step!(sim.grid, dt)
+    find_D!(sim.grid)
+    viscous_step!(sim.grid, dt)
+    find_dv!(sim.grid, dt, 1.0)
+    relaxation_step!(sim.grid, dt)
+    dirichlet_bc!(sim.grid)
+    move_points!(sim.grid, sim.t, dt)
+    sim.t += dt
+    cut_domain!(sim.grid, sim.t)
+    return
+end</code></pre><p>Let us plot the total energy and entropy.</p><pre><code class="language-julia hljs">function postproc!(sim::Simulation)
+    sim.E = 0.0
+    sim.S = 0.0
+    for p in sim.grid.polygons
+        sim.E += p.mass*p.e
+        sim.S += p.mass*log(abs(p.P/abs(p.rho)^gamma))
+    end
+    println(&quot;t = $(sim.t)&quot;)
+    println(&quot;energy = $(sim.E)&quot;)
+    println(&quot;entropy = $(sim.S)&quot;)
+    println()
+end
+
+function main()
+    if !ispath(export_path)
+        mkpath(export_path)
+        @info &quot;created a new path: $(export_path)&quot;
+    end
+    pvd_c = paraview_collection(joinpath(export_path, &quot;cells.pvd&quot;))
+    pvd_p = paraview_collection(joinpath(export_path, &quot;points.pvd&quot;))
+    nframe = 0
+    sim = Simulation()
+    milestones = collect(range(t_end, 0.0, nframes)) # save the data here
+    vtp_vars = (:rho, :v, :e, :P, :phase, :mass)
+    while sim.t &lt; t_end
+        step!(sim)
+        if sim.t &gt; milestones[end]
+            @show sim.t
+            postproc!(sim)
+            println()
+            filename= joinpath(export_path, &quot;cframe$(nframe).vtp&quot;)
+            pvd_c[sim.t] = export_grid(sim.grid, filename, vtp_vars...)
+            filename= joinpath(export_path, &quot;pframe$(nframe).vtp&quot;)
+            pvd_p[sim.t] = export_points(sim.grid, filename, vtp_vars...)
+            pop!(milestones)
+            nframe += 1
+        end
+    end
+    vtk_save(pvd_c)
+    vtk_save(pvd_p)
+
+    x = range(0.6, 1.0, 200)
+    rho = [point_value(sim.grid, RealVector(_x, 0.05), p -&gt; p.rho) for _x in x]
+    P = [point_value(sim.grid, RealVector(_x, 0.05), p -&gt; p.P) for _x in x]
+    v = [point_value(sim.grid, RealVector(_x, 0.05), p -&gt; p.v[1]) for _x in x]
+
+    csv_data = DataFrame(x=x, rho=rho, P=P, v=v)
+	CSV.write(string(export_path, &quot;/linedata.csv&quot;), csv_data)
+    plotdata()
+    print_l1_error(sim.grid)
+    println()
+    print_l2_error(sim.grid)
+end
+
+function plotdata()
+    for var in (:rho, :P, :v)
+        plotdata(var)
+    end
+end
+
+function plotdata(var::Symbol)
+    csv_data = CSV.read(string(export_path, &quot;/linedata.csv&quot;), DataFrame)
+    x_shock = 0.8
+    x_exact = [t_end, x_shock, nextfloat(x_shock), 1.0]
+    y_sim, ylabel, y0, y1, color = @match var begin
+        :rho =&gt; (csv_data.rho, L&quot;\rho&quot;, 4.0, 1.0, :orange)
+        :P =&gt; (csv_data.P, L&quot;P&quot;, 2*(gamma-1.0), P0, :royalblue)
+        :v =&gt; (csv_data.v, L&quot;v&quot;, 1.0, 0.0, :teal)
+    end
+    y_exact = [(x &lt;= x_shock ? y0 : y1) for x in x_exact]
+    plt = plot(
+        x_exact,
+        y_exact,
+        label = &quot;EXACT&quot;,
+        linewidth = 2,
+        color = :black,
+        xlabel = L&quot;x&quot;,
+        ylabel = ylabel,
+        bottom_margin = 5mm,
+        ylims = (0.0, max(y0,y1) + 0.5)
+    )
+    plot!(plt,
+            csv_data.x,
+            y_sim,
+            label = &quot;SIMULATION&quot;,
+            markerstrokewidth = 1,
+            markersize = 3,
+            color = color,
+            marker = :circ
+    )
+    savefig(plt, string(export_path, &quot;/$(string(var)).pdf&quot;))
+    return
+end
+
+function print_l1_error(grid::VoronoiGrid)
+    x_shock = 0.8
+    for var in (:rho, :P, :v)
+        err = 0.0
+        y0, y1 = @match var begin
+            :rho =&gt; (4.0, 1.0)
+            :P =&gt; (2*(gamma-1.0), P0)
+            :v =&gt; (1.0, 0.0)
+        end
+        for p in grid.polygons
+            A = area(p)
+            y = (p.x[1] &lt;= x_shock ? y0 : y1)
+            if (var != :v)
+                err += A*abs(getproperty(p, var) - y)
+            else
+                err += A*abs(getproperty(p, var)[1] - y)
+            end
+        end
+        println(&quot;$(var): l1 error = $(err)&quot;)
+    end
+end
+
+function print_l2_error(grid::VoronoiGrid)
+    x_shock = 0.8
+    for var in (:rho, :P, :v)
+        err = 0.0
+        y0, y1 = @match var begin
+            :rho =&gt; (4.0, 1.0)
+            :P =&gt; (2*(gamma-1.0), P0)
+            :v =&gt; (1.0, 0.0)
+        end
+        for p in grid.polygons
+            A = area(p)
+            y = (p.x[1] &lt;= x_shock ? y0 : y1)
+            if (var != :v)
+                err += A*abs(getproperty(p, var) - y)^2
+            else
+                err += A*abs(getproperty(p, var)[1] - y)^2
+            end
+        end
+        println(&quot;$(var): l2 error = $(sqrt(err))&quot;)
+    end
+end
+
+function linear_regression(x, y)
+    N = length(x)
+    logx = log10.(x)
+    logy = log10.(y)
+    A = [logx ones(N)]
+    b = A\logy
+    return b
+end
+
+function make_convergence_graph()
+    data = CSV.read(joinpath(export_path, &quot;l2_convergence_data.csv&quot;), DataFrame)
+    x = log10.(data.N)
+    y = [log10.(data.rho) log10.(data.P) log10.(data.v)]
+    eoc_rho = linear_regression(data.N, data.rho)[1]
+    eoc_p = linear_regression(data.N, data.P)[1]
+    eoc_v = linear_regression(data.N, data.v)[1]
+    xlabel = L&quot;\log N&quot;
+    ylabel = L&quot;\log \epsilon&quot;
+    rho_label = L&quot;\rho&quot;*&quot;   (EOC = $(-round(eoc_rho, digits=2)))&quot;
+    p_label = L&quot;p&quot;*&quot;   (EOC = $(-round(eoc_p, digits=2)))&quot;
+    v_label = L&quot;v&quot;*&quot;   (EOC = $(-round(eoc_v, digits=2)))&quot;
+    plt = plot(x, y, xlabel=xlabel, ylabel=ylabel, label = [rho_label p_label v_label], marker = :hex, axis_ratio = 1.0)
+    savefig(plt, joinpath(export_path, &quot;l2_convergence.pdf&quot;))
+end
+
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="taylorgreen.html">« Example 8: Taylor-Green Vortex</a><a class="docs-footer-nextpage" href="cpatch.html">Example 9: Circular patch problem »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Wednesday 18 December 2024 14:58">Wednesday 18 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Example 9: Circular patch problem · LagrangianVoronoi.jl</title><meta name="title" content="Example 9: Circular patch problem · LagrangianVoronoi.jl"/><meta property="og:title" content="Example 9: Circular patch problem · LagrangianVoronoi.jl"/><meta property="twitter:title" content="Example 9: Circular patch problem · LagrangianVoronoi.jl"/><meta name="description" content="Documentation for LagrangianVoronoi.jl."/><meta property="og:description" content="Documentation for LagrangianVoronoi.jl."/><meta property="twitter:description" content="Documentation for LagrangianVoronoi.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">LagrangianVoronoi.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="gresho.html">Example 1: Gresho Vortex Benchmark</a></li><li><a class="tocitem" href="cavity.html">Example 2: Lid-driven cavity</a></li><li><a class="tocitem" href="sedov.html">Example 3: Sedov Blast</a></li><li><a class="tocitem" href="doubleshear.html">Example 4: Double Shear Layer</a></li><li><a class="tocitem" href="rayleightaylor.html">Example 5: Rayleigh-Taylor Instability</a></li><li><a class="tocitem" href="triplepoint.html">Example 6: Triple-point problem</a></li><li><a class="tocitem" href="heat.html">Example 7: Rayleigh-Bénard Instability</a></li><li><a class="tocitem" href="taylorgreen.html">Example 8: Taylor-Green Vortex</a></li><li><a class="tocitem" href="piston.html">Example 8: Saltzman piston test</a></li><li class="is-active"><a class="tocitem" href="cpatch.html">Example 9: Circular patch problem</a></li><li><a class="tocitem" href="dambreak.html">Example 10: Dam break</a></li><li><a class="tocitem" href="rotsquare.html">Example 11: Rotating square</a></li><li><a class="tocitem" href="bubble.html">Example 12: Rising bubble</a></li></ul></li><li><a class="tocitem" href="../api.html">API Documentation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="cpatch.html">Example 9: Circular patch problem</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="cpatch.html">Example 9: Circular patch problem</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/OndrejKincl/LagrangianVoronoi.jl/blob/master/docs/src/examples/cpatch.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Example-9:-Circular-patch-problem"><a class="docs-heading-anchor" href="#Example-9:-Circular-patch-problem">Example 9: Circular patch problem</a><a id="Example-9:-Circular-patch-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Example-9:-Circular-patch-problem" title="Permalink"></a></h1>    <img src='../assets/cpatch.png' alt='missing' width="50%" height="50%"><br><p><a href="https://www.sciencedirect.com/science/article/pii/S0045793022001797">Circular patch</a> is a free surface benchmark which admits a semi-analytical solution. Initially, there is a circle of radius 1 with some prescribed velocity. The resulting velocity deformation squeezes the patch. Now, we cannot do free surface with this code, but we can find a reasonable good solution by turning it into a multiphase problem where the surrounding air has much lower density.</p><pre><code class="language-julia hljs">module cpatch
+
+include(&quot;../src/LagrangianVoronoi.jl&quot;)
+using .LagrangianVoronoi
+
+using DifferentialEquations
+using StaticArrays
+using Plots
+using Parameters
+using Base.Threads
+using WriteVTK
+using LinearAlgebra
+using Polyester
+using LaTeXStrings, CSV, DataFrames
+
+const A0 = 0.5
+const R = 1.0
+const Rho = 1000.0
+const rho = Rho/800
+const dr = R/20
+
+const v_char = A0*R
+const dt = 0.1*dr/v_char
+const t_end =  1.0
+const nframes = 100
+const tau = 0.1
+const c0 = 100.0
+const smoothing_length = 3dr
+
+const export_path = &quot;results/cpatch&quot;
+const xlims = (-1.5R, 1.5R)
+const ylims = (-3.0R, 3.0R)
+
+const WATER = 0
+const AIR = 1
+
+function ic!(p::VoronoiPolygon, e)
+    p.c2 = Inf
+    r = norm(p.x)
+    p.phase = (r &lt; R) ? WATER : AIR
+    p.rho = (p.phase == WATER ? Rho : rho)
+    p.mass = p.rho*area(p)
+    if (p.phase == WATER)
+        p.v = v_exact(p.x, e(0.0))
+        p.P = P_exact(p.x, e(0.0))
+    end
+end
+
+mutable struct Simulation &lt;: SimulationWorkspace
+    grid::GridMulti
+    solver::PressureSolver{PolygonMulti}
+    E::Float64  # total energy
+    v_err::Float64 # L^2 error
+    P_err::Float64
+    e::Any # function that describes the exact evolution of the ellipse
+    Simulation() = begin
+        ode = ODEProblem(ellipse_ode, [R, R, A0], (0.0, t_end))
+        e = solve(ode, Rodas4(), reltol = 1e-8, abstol = 1e-8)
+        domain = Rectangle(xlims = xlims, ylims = ylims)
+        grid = GridMulti(domain, dr)
+        populate_circ!(grid, ic! = (p -&gt; ic!(p, e)))
+        solver = PressureSolver(grid, verbose=false)
+        return new(grid, solver, 0.0, 0.0, 0.0, e)
+    end
+end
+
+function ellipse_ode(e, _, _)
+    return [
+        -e[3]*e[1],
+        +e[3]*e[2],
+        (e[3]^2)*(e[1]^2 - e[2]^2)/(e[1]^2 + e[2]^2)
+    ]
+end
+
+function v_exact(x::RealVector, e)::RealVector
+    return RealVector(-e[3]*x[1], e[3]*x[2])
+end
+
+function P_exact(x::RealVector, e)::Float64
+    return -Rho*(e[1]*e[2]*e[3])^2/(e[1]^2 + e[2]^2)*((x[1]/e[1])^2 + (x[2]/e[2])^2 - 1.0)
+end
+
+function step!(sim::Simulation, t::Float64)
+    move!(sim.grid, dt)
+    find_rho!(sim.grid)
+    find_pressure!(sim.solver, dt)
+    pressure_step!(sim.grid, dt)
+    phase_preserving_remapping!(sim.grid, dt, smoothing_length)
+end
+
+function postproc!(sim::Simulation, t::Float64)
+    sim.v_err = 0.0
+    sim.P_err = 0.0
+    sim.E = 0.0
+    max_v_err = 0.0
+    max_P_err = 0.0
+    P_avg = 0.0
+    A_tot = 0.0
+    for p in sim.grid.polygons
+        if (p.phase == AIR) continue end
+        A = area(p)
+        et = sim.e(t)
+        sim.v_err += A*norm_squared(p.v - v_exact(p.x, et))
+        max_v_err += A*norm_squared(v_exact(p.x, et))
+        P_avg += A*(p.P - P_exact(p.x, et))
+        A_tot += A
+        max_P_err += A*P_exact(p.x, et)^2
+        sim.E += p.mass*norm_squared(p.v)
+    end
+    P_avg /= A_tot
+    for p in sim.grid.polygons
+        if (p.phase == AIR) continue end
+        A = area(p)
+        et = sim.e(t)
+        sim.P_err += A*(p.P - P_exact(p.x, et) - P_avg)^2
+    end
+    sim.P_err = sqrt(sim.P_err)/sqrt(max_P_err)
+    sim.v_err = sqrt(sim.v_err)/sqrt(max_v_err)
+    @show t
+    @show sim.v_err
+    @show sim.P_err
+    @show sim.E
+    println()
+end
+
+
+function main()
+    sim = Simulation()
+    run!(sim, dt, t_end, step!;
+        path = export_path,
+        postproc! = postproc!,
+        vtp_vars = (:v, :P, :rho, :phase),      # local variables exported into vtp
+        csv_vars = (:E, :v_err, :P_err),          # global variables exported into csv
+        nframes = nframes,                # number of time frames
+        save_points = true
+    )
+end
+
+function linear_regression(x, y)
+    N = length(x)
+    logx = log10.(x)
+    logy = log10.(y)
+    A = [logx ones(N)]
+    b = A\logy
+    return b
+end
+
+function make_convergence_graph()
+    data = CSV.read(joinpath(export_path, &quot;convergence_data.csv&quot;), DataFrame)
+    x = log10.(data.N)
+    y = [log10.(data.P) log10.(data.v)]
+    eoc_p = linear_regression(data.N, data.P)[1]
+    eoc_v = linear_regression(data.N, data.v)[1]
+    xlabel = L&quot;\log N&quot;
+    ylabel = L&quot;\log \epsilon&quot;
+    p_label = L&quot;p&quot;*&quot;   (EOC = $(-round(eoc_p, digits=2)))&quot;
+    v_label = L&quot;v&quot;*&quot;   (EOC = $(-round(eoc_v, digits=2)))&quot;
+    plt = plot(x, y, xlabel=xlabel, ylabel=ylabel, label = [p_label v_label], marker = :hex, axis_ratio = 1.0)
+    savefig(plt, joinpath(export_path, &quot;convergence.pdf&quot;))
+end
+
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="piston.html">« Example 8: Saltzman piston test</a><a class="docs-footer-nextpage" href="dambreak.html">Example 10: Dam break »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Wednesday 18 December 2024 14:58">Wednesday 18 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
