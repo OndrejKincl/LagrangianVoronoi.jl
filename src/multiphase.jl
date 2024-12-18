@@ -1,5 +1,3 @@
-using SmoothedParticles:wendland2, rDwendland2
-
 function phase_centroid(p::VoronoiPolygon, grid::VoronoiGrid, h::Float64)::RealVector
     Cx = VEC0
     C = 0.0

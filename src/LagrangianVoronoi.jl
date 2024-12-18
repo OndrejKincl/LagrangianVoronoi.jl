@@ -8,6 +8,7 @@ using Polyester
 using CSV
 using DataFrames
 using Krylov
+using SmoothedParticles:wendland2, rDwendland2
 
 include("geometry.jl")
 export RealVector, RealMatrix, VEC0, VECX, VECY, MAT0, MAT1, VECNULL, Edge, Rectangle, UnitRectangle, len, isinside, norm_squared, verts, midpoint
