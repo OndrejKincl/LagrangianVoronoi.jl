@@ -65,6 +65,6 @@ include("viscous_solver.jl")
 export ViscousSolver, viscous_step!
 
 include("multiphase.jl")
-export surface_tension!, phase_preserving_remapping!, isinterface
+export surface_tension!, phase_preserving_remapping!, isinterface, mesh_quality
 
 end

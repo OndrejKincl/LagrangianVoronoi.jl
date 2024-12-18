@@ -13,7 +13,12 @@ function make_all()
         "rayleightaylor.jl",
         "triplepoint.jl",
         "heat.jl",
-        "taylorgreen.jl"
+        "taylorgreen.jl",
+        "piston.jl",
+        "cpatch.jl",
+        "dambreak.jl",
+        "rotsquare.jl",
+        "bubble.jl"
     ]
     example_md_dir  = joinpath(@__DIR__,"src","examples")
     generated_examples = []

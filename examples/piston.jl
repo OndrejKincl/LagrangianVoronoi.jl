@@ -1,5 +1,15 @@
 #=
-# Example 8: Saltzman piston test   
+# Example 8: Saltzman piston test
+```@raw html
+    <img src='../assets/piston.png' alt='missing' width="50%" height="50%"><br>
+```
+
+In this [challenging test](https://www.sciencedirect.com/science/article/pii/S0021999117304679), the domain will vary with time. We study a piston of length 1 and 
+width 0.1 filled with ideal gas which is initially at rest. Starting from ``t=0``, the piston is compressed at 
+a uniform rate at speed equal to 1. This produces a strong shockwave, whose characteristics can be computed analytically
+from Rankine-Hugeniot conditions. The simulation is terminated at ``t = t_end``. Unknown things will
+happen if ``t_end >= 1.0``, maybe it will even destroy the universe!
+
 =#
 
 module piston

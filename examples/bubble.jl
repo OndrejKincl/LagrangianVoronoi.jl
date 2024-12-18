@@ -1,3 +1,19 @@
+#=
+# Example 12: Rising bubble
+```@raw html
+    <img src='../assets/bubble.png' alt='missing' width="100%"><br>
+```
+
+An air bubble rising due to buoyancy. Outputs of the simulation are
+
+* bubble center of mass (y-coordinate) 
+* the rising speed
+* the shape at ``t=3``
+
+The result is compared to a reference solution. 
+Find details in this [excellent overview](https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/bubble/bubble_verification.html).
+
+=#
 module bubble
 
 include("../src/LagrangianVoronoi.jl")
@@ -107,8 +123,8 @@ function main()
     run!(sim, dt, t_end, step!; 
         path = export_path, 
         postproc! = postproc!,
-        vtp_vars = (:v, :P, :rho, :phase),      # local variables exported into vtp
-        nframes = nframes,                # number of time frames
+        vtp_vars = (:v, :P, :rho, :phase),
+        nframes = nframes,
         save_points = true,
         save_csv = true,
         csv_vars = (:bubble_y, :bubble_vy)

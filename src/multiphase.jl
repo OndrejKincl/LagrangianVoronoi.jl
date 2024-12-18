@@ -46,6 +46,16 @@ function findcolor(grid::VoronoiGrid, x::RealVector, phase::Int, h::Float64)
 end
 
 function phase_preserving_remapping!(grid::VoronoiGrid, dt::Float64, h::Float64; quality_treshold::Float64 = 0.3)
+    if mesh_quality(grid) < quality_treshold
+        @batch for p in grid.polygons
+            c = phase_centroid(p, grid, h)
+            p.dv = (c - p.x)/dt
+        end
+        relaxation_step!(grid, dt)
+    end
+end
+
+function mesh_quality(grid::VoronoiGrid)::Float64
     @batch for p in grid.polygons
         rmax = 0.0
         rmin = Inf
@@ -56,14 +66,7 @@ function phase_preserving_remapping!(grid::VoronoiGrid, dt::Float64, h::Float64;
         end
         p.quality = rmin/rmax
     end
-    mesh_quality = minimum(p::VoronoiPolygon -> p.quality, grid.polygons)
-    if mesh_quality < quality_treshold
-        @batch for p in grid.polygons
-            c = phase_centroid(p, grid, h)
-            p.dv = (c - p.x)/dt
-        end
-        relaxation_step!(grid, dt)
-    end
+    return minimum(p::VoronoiPolygon -> p.quality, grid.polygons)
 end
 
 function st_tensor(p::VoronoiPolygon)::RealMatrix
