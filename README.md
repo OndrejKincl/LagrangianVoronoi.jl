@@ -14,26 +14,11 @@ If you are interested in the beautiful math behind this method, you can have a l
 If you have any suggestions or comments, feel free to raise an issue via the GitHub interface or contact me at ondrej.kincl@unitn.it. 
 
 
-## Install prerequisites
+## Install the library
 Run the following command in Julia terminal:
 ```
 using Pkg
-deps = [
-  "Polyester",
-  "WriteVTK",
-  "CSV",
-  "StaticArrays",
-  "SparseArrays",
-  "Match",
-  "Parameters",
-  "DataFrames",
-  "Plots",
-  "LaTeXStrings",
-  "Krylov",
-  "Measures",
-  "SmoothedParticles"
-]
-Pkg.add(deps)
+Pkg.add("LagrangianVoronoi")
 ```
 ## Quick start
 Clone this repository. Open the `examples` folder and run this from your terminal:
