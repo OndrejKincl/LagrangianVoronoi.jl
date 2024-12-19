@@ -34,6 +34,12 @@ function clear!(A::ThreadedMat)
     end 
 end
 
+"""
+    ViscousSolver(grid::VoronoiGrid{T}; verbose::Int=0) where T
+
+This structure implements an implicit viscous fractional operator. Useful for multiphase problems
+or when the viscosity is relatively large.
+"""
 mutable struct ViscousSolver{T}
     grid::VoronoiGrid{T}
     A::ThreadedMat   # lhs operator
@@ -100,6 +106,12 @@ function assemble!(solver::ViscousSolver, dt::Float64)
     end
 end
 
+"""
+    viscous_step!(solver::ViscousSolver, dt::Float64)
+
+Apply viscousity in an implicit way. The viscous coefficient `mu` must be initialized for
+every cell.
+"""
 function viscous_step!(solver::ViscousSolver, dt::Float64)
     assemble!(solver, dt)
     minres!(

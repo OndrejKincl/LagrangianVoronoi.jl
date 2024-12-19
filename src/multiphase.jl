@@ -43,6 +43,11 @@ function findcolor(grid::VoronoiGrid, x::RealVector, phase::Int, h::Float64)
     return C/S
 end
 
+"""
+    phase_preserving_remapping!(grid::VoronoiGrid, dt::Float64, h::Float64; quality_treshold::Float64 = 0.3)
+
+Improve the mesh quality using the lloyd iterations with color function used as a weight for computing the centroid.    
+"""
 function phase_preserving_remapping!(grid::VoronoiGrid, dt::Float64, h::Float64; quality_treshold::Float64 = 0.3)
     if mesh_quality(grid) < quality_treshold
         @batch for p in grid.polygons
@@ -53,6 +58,12 @@ function phase_preserving_remapping!(grid::VoronoiGrid, dt::Float64, h::Float64;
     end
 end
 
+"""
+    mesh_quality(grid::VoronoiGrid)::Float64
+
+Return the maximum ratio of `rmax_i/rmin_i` for all `i`, where `rmax_i` and `rmin_i` are the 
+distances to the furthest and nearest neighboring generating seed relative to the seed `x_i`.
+"""
 function mesh_quality(grid::VoronoiGrid)::Float64
     @batch for p in grid.polygons
         rmax = 0.0
@@ -67,12 +78,19 @@ function mesh_quality(grid::VoronoiGrid)::Float64
     return minimum(p::VoronoiPolygon -> p.quality, grid.polygons)
 end
 
+# tensor of surface tension
 function st_tensor(p::VoronoiPolygon)::RealMatrix
     cg = norm(p.cgrad)
     n = p.cgrad/(cg + eps())
     return p.st*cg*(MAT1 - outer(n, n))
 end
 
+"""
+    surface_tension!(grid::VoronoiGrid, dt::Float64, h::Float64)
+
+Apply the surface tension force. (This doesn't do anything unless you initialize the 
+surface tension coefficient `st` of cells.)
+"""
 function surface_tension!(grid::VoronoiGrid, dt::Float64, h::Float64)
     # compute the gradient of coloring function
     @batch for p in grid.polygons
@@ -106,6 +124,11 @@ function surface_tension!(grid::VoronoiGrid, dt::Float64, h::Float64)
     end
 end
 
+"""
+    isinterface(p::VoronoiPolygon, grid::VoronoiGrid)::Bool
+
+Returns true if at least one neighbor of `q` belongs to a different phase.
+"""
 function isinterface(p::VoronoiPolygon, grid::VoronoiGrid)::Bool
     for (q,_,_) in neighbors(p, grid)
         if (q.phase != p.phase) return true end
